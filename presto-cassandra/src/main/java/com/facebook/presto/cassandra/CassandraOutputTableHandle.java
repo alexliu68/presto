@@ -43,7 +43,6 @@ public class CassandraOutputTableHandle
             @JsonProperty("columnTypes") List<ColumnType> columnTypes,
             @JsonProperty("tableOwner") String tableOwner)
     {
-        System.out.println("++++++++++++++++++++++ connectionId for outputTableHandle: " + connectorId);
         this.connectorId = checkNotNull(connectorId, "clientId is null");
         this.schemaName = checkNotNull(schemaName, "schemaName is null");
         this.tableName = checkNotNull(tableName, "tableName is null");
