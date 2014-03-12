@@ -52,7 +52,6 @@ public class CassandraRecordSink implements RecordSink
         queryBuilder.append(")");
 
         insertQuery = queryBuilder.toString();
-        System.out.println("+++++++++++++ record sink query: " + insertQuery);
         bindedValues = Lists.newArrayList();
     }
 
