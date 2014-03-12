@@ -40,7 +40,7 @@ public class CassandraRecordSink implements RecordSink
         fieldCount = handle.getColumnNames().size();
         sampleWeightField = handle.getColumnNames().indexOf(SAMPLE_WEIGHT_COLUMN_NAME);
         this.cassandraSession = cassandraSession;
-        StringBuilder queryBuilder = new StringBuilder(String.format("INSERT INTO %s.%s(", handle.getSchemaName(), handle.getTableName()));
+        StringBuilder queryBuilder = new StringBuilder(String.format("INSERT INTO \"%s\".\"%s\"(", handle.getSchemaName(), handle.getTableName()));
         queryBuilder.append("id");
         for (String columnName : handle.getColumnNames()) {
             queryBuilder.append(",").append(columnName);

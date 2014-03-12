@@ -241,11 +241,11 @@ public class CassandraMetadata
 
         // get the root directory for the database
         SchemaTableName table = tableMetadata.getTable();
-        String schemaName = table.getSchemaName();
         String tableName = table.getTableName();
         List<String> columns = columnNames.build();
         List<ColumnType> types = columnTypes.build();
-        StringBuilder queryBuilder = new StringBuilder(String.format("CREATE TABLE %S.%S(id uuid primary key", schemaName, tableName));
+        CassandraTableHandle tableHandle = getTableHandle(tableMetadata.getTable());
+        StringBuilder queryBuilder = new StringBuilder(String.format("CREATE TABLE \"%s\".\"%s\"(id uuid primary key", tableHandle.getSchemaName(), tableName));
         for (int i = 0; i < columns.size(); i++) {
             String name = columns.get(i);
             ColumnType type = types.get(i);
@@ -259,7 +259,7 @@ public class CassandraMetadata
         cassandraSession.executeQuery(queryBuilder.toString());
         return new CassandraOutputTableHandle(
                 connectorId,
-                schemaName,
+                tableHandle.getSchemaName(),
                 tableName,
                 columnNames.build(),
                 columnTypes.build(),
