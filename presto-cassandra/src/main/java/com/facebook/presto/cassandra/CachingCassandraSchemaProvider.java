@@ -236,12 +236,14 @@ public class CachingCassandraSchemaProvider
 
     private String getCaseSensitiveSchemaName(String caseInsensitiveName)
     {
-        return getCacheValue(schemaNamesCache, "", RuntimeException.class).get(caseInsensitiveName.toLowerCase());
+        String caseSensitiveSchemaName = getCacheValue(schemaNamesCache, "", RuntimeException.class).get(caseInsensitiveName.toLowerCase());
+        return caseSensitiveSchemaName == null ? caseInsensitiveName : caseSensitiveSchemaName;
     }
 
     private String getCaseSensitiveTableName(SchemaTableName schemaTableName)
     {
-        return getCacheValue(tableNamesCache, schemaTableName.getSchemaName(), SchemaNotFoundException.class).get(schemaTableName.getTableName().toLowerCase());
+        String  caseSensitiveTableName = getCacheValue(tableNamesCache, schemaTableName.getSchemaName(), SchemaNotFoundException.class).get(schemaTableName.getTableName().toLowerCase());
+        return caseSensitiveTableName == null ? schemaTableName.getTableName() : caseSensitiveTableName;
     }
 
     public CassandraTable getTable(CassandraTableHandle tableHandle)
