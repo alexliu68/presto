@@ -28,7 +28,7 @@ public class TestCassandraClientConfig
     public void testDefaults()
     {
         ConfigAssertions.assertRecordedDefaults(ConfigAssertions.recordDefaults(CassandraClientConfig.class)
-                .setLimitForPartitionKeySelect(100_000)
+                .setLimitForPartitionKeySelect(200)
                 .setFetchSizeForPartitionKeySelect(20_000)
                 .setMaxSchemaRefreshThreads(10)
                 .setSchemaCacheTtl(new Duration(1, TimeUnit.HOURS))
