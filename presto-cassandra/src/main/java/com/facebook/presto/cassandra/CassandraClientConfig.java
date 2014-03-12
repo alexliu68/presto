@@ -49,6 +49,7 @@ public class CassandraClientConfig
     private int thriftPort = 9160;
     private String thriftConnectionFactoryClassName = "org.apache.cassandra.thrift.TFramedTransportFactory";
     private Map<String, String> transportFactoryOptions = Maps.newHashMap();
+    private int partitionSizeForBatchSelect = 100;
 
     @Min(0)
     public int getLimitForPartitionKeySelect()
@@ -243,6 +244,18 @@ public class CassandraClientConfig
             }
             this.transportFactoryOptions = tfOptions;
         }
+        return this;
+    }
+
+    public int getPartitionSizeForBatchSelect()
+    {
+        return partitionSizeForBatchSelect;
+    }
+
+    @Config("cassandra.partition-size-for-batch-select")
+    public CassandraClientConfig setPartitionSizeForBatchSelect(int partitionSizeForBatchSelect)
+    {
+        this.partitionSizeForBatchSelect = partitionSizeForBatchSelect;
         return this;
     }
 }
