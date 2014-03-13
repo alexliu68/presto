@@ -270,7 +270,7 @@ public class CassandraSplitManager
                 hostMap.put(hostAddresses, addresses);
             }
             else {
-                CassandraSplit split = new CassandraSplit(connectorId, schema, table, cassandraPartition.getPartitionId(), null, true, addresses);
+                CassandraSplit split = new CassandraSplit(connectorId, schema, table, cassandraPartition.getPartitionId(), null, addresses);
                 builder.add(split);
             }
         }
@@ -286,7 +286,7 @@ public class CassandraSplitManager
                     size++;
                     if (size > partitionSizeForBatchSelect) {
                         String partitionId = String.format("%s in (%s)", partitionKeyColumnName, sb.toString());
-                        CassandraSplit split = new CassandraSplit(connectorId, schema, table, partitionId, null, true, hostMap.get(entry.getKey()));
+                        CassandraSplit split = new CassandraSplit(connectorId, schema, table, partitionId, null, hostMap.get(entry.getKey()));
                         builder.add(split);
                         size = 0;
                         sb.setLength(0);
@@ -295,12 +295,12 @@ public class CassandraSplitManager
                 }
                 if (size > 0) {
                     String partitionId = String.format("%s in (%s)", partitionKeyColumnName, sb.toString());
-                    CassandraSplit split = new CassandraSplit(connectorId, schema, table, partitionId, null, true, hostMap.get(entry.getKey()));
+                    CassandraSplit split = new CassandraSplit(connectorId, schema, table, partitionId, null, hostMap.get(entry.getKey()));
                     builder.add(split);
                 }
             }
         }
-        return builder.build(); 
+        return builder.build();
     }
 
     @Override
