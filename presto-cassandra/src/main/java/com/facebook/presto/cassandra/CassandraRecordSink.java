@@ -48,7 +48,7 @@ public class CassandraRecordSink implements RecordSink
             }
         }
         queryBuilder.append(") VALUES (?");
-        
+
         for (int i = sampleWeightField > -1 ? 1 : 0; i < handle.getColumnNames().size(); i++) {
             queryBuilder.append(",?");
         }
