@@ -19,11 +19,14 @@ import com.facebook.presto.spi.ColumnType;
 import com.facebook.presto.spi.RecordCursor;
 import com.google.common.base.Charsets;
 
+import io.airlift.log.Logger;
+
 import java.util.List;
 
 public class CassandraRecordCursor
         implements RecordCursor
 {
+    private static final Logger log = Logger.get(CassandraRecordCursor.class);
     private final List<FullCassandraType> fullCassandraTypes;
     private final ResultSet rs;
     private Row currentRow;
@@ -33,6 +36,7 @@ public class CassandraRecordCursor
     public CassandraRecordCursor(CassandraSession cassandraSession,
             List<FullCassandraType> fullCassandraTypes, String cql)
     {
+        log.debug("cql query: %s", cql);
         this.fullCassandraTypes = fullCassandraTypes;
         rs = cassandraSession.executeQuery(cql);
         currentRow = null;

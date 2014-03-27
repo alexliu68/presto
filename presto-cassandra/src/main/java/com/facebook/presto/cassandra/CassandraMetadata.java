@@ -246,7 +246,7 @@ public class CassandraMetadata
             columnNames.add(column.getName());
             columnTypes.add(column.getType());
         }
-        System.out.println("_________________________sampled?" + tableMetadata.isSampled() + ", table name: " + tableMetadata.getTable().toString());
+
         if (tableMetadata.isSampled()) {
             columnNames.add(SAMPLE_WEIGHT_COLUMN_NAME);
             columnTypes.add(ColumnType.LONG);

@@ -95,32 +95,11 @@ public class CassandraSplitManager
         checkNotNull(tableHandle, "tableHandle is null");
         checkNotNull(tupleDomain, "tupleDomain is null");
         CassandraTableHandle cassandraTableHandle = (CassandraTableHandle) tableHandle;
-
         CassandraTable table = schemaProvider.getTable(cassandraTableHandle);
-
         List<CassandraColumnHandle> partitionKeys = table.getPartitionKeyColumns();
-        List<Comparable<?>> filterPrefix = new ArrayList<>();
-        for (int i = 0; i < partitionKeys.size(); i++) {
-            CassandraColumnHandle columnHandle = partitionKeys.get(i);
-
-            // only add to prefix if all previous keys have a value
-            if (filterPrefix.size() == i && !tupleDomain.isNone()) {
-                Domain domain = tupleDomain.getDomains().get(columnHandle);
-                if (domain != null && domain.getRanges().getRangeCount() == 1) {
-                    // We intentionally ignore whether NULL is in the domain since partition keys can never be NULL
-                    Range range = Iterables.getOnlyElement(domain.getRanges());
-                    if (range.isSingleValue()) {
-                        Comparable<?> value = range.getLow().getValue();
-                        checkArgument(value instanceof Boolean || value instanceof String || value instanceof Double || value instanceof Long,
-                                "Only Boolean, String, Double and Long partition keys are supported");
-                        filterPrefix.add(value);
-                    }
-                }
-            }
-        }
 
         // fetch the partitions
-        List<CassandraPartition> allPartitions = schemaProvider.getPartitions(table, filterPrefix);
+        List<CassandraPartition> allPartitions = getAllPartitions(table, tupleDomain);
         log.debug("%s.%s #partitions: %d", cassandraTableHandle.getSchemaName(), cassandraTableHandle.getTableName(), allPartitions.size());
 
         // do a final pass to filter based on fields that could not be used to build the prefix
@@ -132,9 +111,14 @@ public class CassandraSplitManager
         // All partition key domains will be fully evaluated, so we don't need to include those
         TupleDomain remainingTupleDomain = TupleDomain.none();
         if (!tupleDomain.isNone()) {
-            @SuppressWarnings({"rawtypes", "unchecked"})
-            List<ColumnHandle> partitionColumns = (List) partitionKeys;
-            remainingTupleDomain = TupleDomain.withColumnDomains(Maps.filterKeys(tupleDomain.getDomains(), not(in(partitionColumns))));
+            if (partitions.size() == 1 && ((CassandraPartition) partitions.get(0)).isUnpartitioned()) {
+                remainingTupleDomain = tupleDomain;
+            }
+            else {
+                @SuppressWarnings({"rawtypes", "unchecked"})
+                List<ColumnHandle> partitionColumns = (List) partitionKeys;
+                remainingTupleDomain = TupleDomain.withColumnDomains(Maps.filterKeys(tupleDomain.getDomains(), not(in(partitionColumns))));
+            }
         }
 
         // push down indexed column fixed value predicates only for unpartitioned partition which uses token range query
@@ -166,6 +150,34 @@ public class CassandraSplitManager
         return new PartitionResult(partitions, remainingTupleDomain);
     }
 
+    private List<CassandraPartition> getAllPartitions(CassandraTable table, TupleDomain tupleDomain)
+    {
+        List<CassandraColumnHandle> partitionKeys = table.getPartitionKeyColumns();
+        List<Comparable<?>> filterPrefix = new ArrayList<>();
+        for (int i = 0; i < partitionKeys.size(); i++) {
+            CassandraColumnHandle columnHandle = partitionKeys.get(i);
+
+            // only add to prefix if all previous keys have a value
+            if (filterPrefix.size() == i && !tupleDomain.isNone()) {
+                Domain domain = tupleDomain.getDomains().get(columnHandle);
+                if (domain != null && domain.getRanges().getRangeCount() == 1) {
+                    // We intentionally ignore whether NULL is in the domain since partition keys can never be NULL
+                    Range range = Iterables.getOnlyElement(domain.getRanges());
+                    if (range.isSingleValue()) {
+                        Comparable<?> value = range.getLow().getValue();
+                        checkArgument(value instanceof Boolean || value instanceof String || value instanceof Double || value instanceof Long,
+                                "Only Boolean, String, Double and Long partition keys are supported");
+                        filterPrefix.add(value);
+                    }
+                }
+            }
+        }
+
+        // fetch the partitions
+        List<CassandraPartition> allPartitions = schemaProvider.getPartitions(table, filterPrefix);
+        return allPartitions;
+    }
+
     @Override
     public SplitSource getPartitionSplits(TableHandle tableHandle, List<Partition> partitions)
     {
@@ -176,6 +188,9 @@ public class CassandraSplitManager
         checkNotNull(partitions, "partitions is null");
         if (partitions.isEmpty()) {
             return new FixedSplitSource(connectorId, ImmutableList.<Split>of());
+        }
+        for (Partition partition : partitions) {
+            CassandraPartition cassandraPartition = (CassandraPartition) partition;
         }
 
         // if this is an unpartitioned table, split into equal ranges
