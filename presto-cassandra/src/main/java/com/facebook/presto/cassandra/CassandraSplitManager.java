@@ -38,14 +38,22 @@ import com.google.common.collect.Iterables;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
+import com.google.common.util.concurrent.ListenableFuture;
+import com.google.common.util.concurrent.ListeningExecutorService;
+import com.google.common.util.concurrent.MoreExecutors;
 import com.google.inject.Inject;
 import io.airlift.log.Logger;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.Stack;
+import java.util.concurrent.Callable;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.Executors;
 
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkNotNull;
@@ -153,28 +161,87 @@ public class CassandraSplitManager
     private List<CassandraPartition> getAllPartitions(CassandraTable table, TupleDomain tupleDomain)
     {
         List<CassandraColumnHandle> partitionKeys = table.getPartitionKeyColumns();
-        List<Comparable<?>> filterPrefix = new ArrayList<>();
-        for (int i = 0; i < partitionKeys.size(); i++) {
-            CassandraColumnHandle columnHandle = partitionKeys.get(i);
-
-            // only add to prefix if all previous keys have a value
-            if (filterPrefix.size() == i && !tupleDomain.isNone()) {
+        List<Comparable<?>> emptyPrefix = new ArrayList<>();
+        Stack<List<Comparable<?>>> stack = new Stack<>();
+        stack.add(emptyPrefix);
+        boolean partitialPartionKeys = false;
+        if (!tupleDomain.isNone()) {
+            for (int i = 0; i < partitionKeys.size(); i++) {
+                CassandraColumnHandle columnHandle = partitionKeys.get(i);
                 Domain domain = tupleDomain.getDomains().get(columnHandle);
-                if (domain != null && domain.getRanges().getRangeCount() == 1) {
-                    // We intentionally ignore whether NULL is in the domain since partition keys can never be NULL
-                    Range range = Iterables.getOnlyElement(domain.getRanges());
-                    if (range.isSingleValue()) {
-                        Comparable<?> value = range.getLow().getValue();
-                        checkArgument(value instanceof Boolean || value instanceof String || value instanceof Double || value instanceof Long,
-                                "Only Boolean, String, Double and Long partition keys are supported");
-                        filterPrefix.add(value);
+                if (domain != null) {
+                    List<Range> ranges = domain.getRanges().getRanges();
+                    Stack<List<Comparable<?>>> tempStack = new Stack<>();
+                    while (!stack.isEmpty()) {
+                        if (stack.peek().size() == i) {
+                            List<Comparable<?>> filter = stack.pop();
+                            int j = 0;
+                            for (Range range : ranges) {
+                                if (range.isSingleValue()) {
+                                    Comparable<?> value = range.getSingleValue();
+                                    checkArgument(value instanceof Boolean || value instanceof String || value instanceof Double || value instanceof Long,
+                                            "Only Boolean, String, Double and Long partition keys are supported");
+                                    if (j == ranges.size() - 1) {
+                                        filter.add(value);
+                                        tempStack.add(filter);
+                                    }
+                                    else {
+                                        List<Comparable<?>> filterCopy = new ArrayList<>(filter);
+                                        if (filter.size() > 0) {
+                                            Collections.copy(filterCopy, filter);
+                                        }
+                                        filterCopy.add(value);
+                                        tempStack.add(filterCopy);
+                                    }
+                                }
+                            }
+                        }
+                        else {
+                            partitialPartionKeys = true;
+                            break;
+                        }
                     }
+                    if (partitialPartionKeys) {
+                        stack.clear();
+                        stack.add(emptyPrefix);
+                        break;
+                    }
+                    if (tempStack.size() != 0) {
+                        stack = tempStack;
+                    }
+                }
+                else {
+                    stack.clear();
+                    stack.add(emptyPrefix);
+                    break;
                 }
             }
         }
 
-        // fetch the partitions
-        List<CassandraPartition> allPartitions = schemaProvider.getPartitions(table, filterPrefix);
+        List<CassandraPartition> allPartitions = new ArrayList<>();
+        ListeningExecutorService service = MoreExecutors.listeningDecorator(Executors.newFixedThreadPool(10));
+        List<ListenableFuture<List<CassandraPartition>>> getPartitionResults = Lists.newArrayList();
+        final CassandraTable cassandraTable = table;
+        while (!stack.isEmpty()) {
+            final List<Comparable<?>> filter = stack.pop();
+            getPartitionResults.add(service.submit(new Callable<List<CassandraPartition>>()
+                    {
+                        public List<CassandraPartition> call()
+                        {
+                            return schemaProvider.getPartitions(cassandraTable, filter);
+                        }
+                    }));
+        }
+
+        for (ListenableFuture<List<CassandraPartition>> result : getPartitionResults) {
+            try {
+                Collections.addAll(allPartitions, result.get().toArray(new CassandraPartition[0]));
+            }
+            catch (InterruptedException | ExecutionException e) {
+                log.error("Error in get partitions", e);
+            }
+        }
+
         return allPartitions;
     }
 
