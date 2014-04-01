@@ -164,7 +164,7 @@ public class CassandraSplitManager
         List<Comparable<?>> emptyPrefix = new ArrayList<>();
         Stack<List<Comparable<?>>> stack = new Stack<>();
         stack.add(emptyPrefix);
-        boolean partitialPartionKeys = false;
+        boolean partialPartitionKeys = false;
         if (!tupleDomain.isNone()) {
             for (int i = 0; i < partitionKeys.size(); i++) {
                 CassandraColumnHandle columnHandle = partitionKeys.get(i);
@@ -197,11 +197,11 @@ public class CassandraSplitManager
                             }
                         }
                         else {
-                            partitialPartionKeys = true;
+                            partialPartitionKeys = true;
                             break;
                         }
                     }
-                    if (partitialPartionKeys) {
+                    if (partialPartitionKeys) {
                         stack.clear();
                         stack.add(emptyPrefix);
                         break;
