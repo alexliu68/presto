@@ -132,14 +132,14 @@ public class TestCachingCassandraSchemaProvider
 
         List<Comparable<?>> empty = ImmutableList.of();
         assertEquals(mockSession.getAccessCount(), 1);
-        assertEquals(expectedList, schemaProvider.getPartitions(table, empty).toString());
+        assertEquals(expectedList, schemaProvider.getPartitions(table, empty, -1, -1).toString());
         assertEquals(mockSession.getAccessCount(), 2);
-        assertEquals(expectedList, schemaProvider.getPartitions(table, empty).toString());
+        assertEquals(expectedList, schemaProvider.getPartitions(table, empty, -1, -1).toString());
         assertEquals(mockSession.getAccessCount(), 2);
 
         schemaProvider.flushCache();
 
-        assertEquals(expectedList, schemaProvider.getPartitions(table, empty).toString());
+        assertEquals(expectedList, schemaProvider.getPartitions(table, empty, -1, -1).toString());
         assertEquals(mockSession.getAccessCount(), 3);
     }
 

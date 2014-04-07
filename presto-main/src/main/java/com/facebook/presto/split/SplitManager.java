@@ -24,6 +24,7 @@ import com.google.common.collect.Sets;
 import com.google.inject.Inject;
 
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -42,15 +43,15 @@ public class SplitManager
         splitManagers.add(connectorSplitManager);
     }
 
-    public PartitionResult getPartitions(TableHandle table, Optional<TupleDomain> tupleDomain)
+    public PartitionResult getPartitions(TableHandle table, Optional<TupleDomain> tupleDomain, Map<String, String> hints)
     {
-        return getConnectorSplitManager(table).getPartitions(table, tupleDomain.or(TupleDomain.all()));
+        return getConnectorSplitManager(table).getPartitions(table, tupleDomain.or(TupleDomain.all()), hints);
     }
 
-    public SplitSource getPartitionSplits(TableHandle handle, List<Partition> partitions)
+    public SplitSource getPartitionSplits(TableHandle handle, List<Partition> partitions, Map<String, String> hints)
     {
         ConnectorSplitManager connectorSplitManager = getConnectorSplitManager(handle);
-        return connectorSplitManager.getPartitionSplits(handle, partitions);
+        return connectorSplitManager.getPartitionSplits(handle, partitions, hints);
     }
 
     private ConnectorSplitManager getConnectorSplitManager(TableHandle handle)

@@ -21,6 +21,7 @@ import com.facebook.presto.spi.TableHandle;
 import com.facebook.presto.spi.TupleDomain;
 
 import java.util.List;
+import java.util.Map;
 
 import static java.util.Objects.requireNonNull;
 
@@ -53,18 +54,18 @@ public final class ClassLoaderSafeConnectorSplitManager
     }
 
     @Override
-    public PartitionResult getPartitions(TableHandle table, TupleDomain tupleDomain)
+    public PartitionResult getPartitions(TableHandle table, TupleDomain tupleDomain, Map<String, String> hints)
     {
         try (ThreadContextClassLoader ignored = new ThreadContextClassLoader(classLoader)) {
-            return delegate.getPartitions(table, tupleDomain);
+            return delegate.getPartitions(table, tupleDomain, hints);
         }
     }
 
     @Override
-    public SplitSource getPartitionSplits(TableHandle table, List<Partition> partitions)
+    public SplitSource getPartitionSplits(TableHandle table, List<Partition> partitions, Map<String, String> hints)
     {
         try (ThreadContextClassLoader ignored = new ThreadContextClassLoader(classLoader)) {
-            return delegate.getPartitionSplits(table, partitions);
+            return delegate.getPartitionSplits(table, partitions, hints);
         }
     }
 

@@ -323,7 +323,7 @@ public class LocalQueryRunner
 
             TableScanNode tableScan = (TableScanNode) sourceNode;
 
-            SplitSource splitSource = splitManager.getPartitionSplits(tableScan.getTable(), getPartitions(tableScan));
+            SplitSource splitSource = splitManager.getPartitionSplits(tableScan.getTable(), getPartitions(tableScan), tableScan.getHints().orNull());
 
             ImmutableSet.Builder<ScheduledSplit> scheduledSplits = ImmutableSet.builder();
             while (!splitSource.isFinished()) {
@@ -369,9 +369,8 @@ public class LocalQueryRunner
         if (node.getGeneratedPartitions().isPresent()) {
             return node.getGeneratedPartitions().get().getPartitions();
         }
-
         // Otherwise return all partitions
-        PartitionResult matchingPartitions = splitManager.getPartitions(node.getTable(), Optional.<TupleDomain>absent());
+        PartitionResult matchingPartitions = splitManager.getPartitions(node.getTable(), Optional.<TupleDomain>absent(), node.getHints().orNull());
         return matchingPartitions.getPartitions();
     }
 
@@ -422,8 +421,8 @@ public class LocalQueryRunner
     private Split getLocalQuerySplit(TableHandle tableHandle)
     {
         try {
-            List<Partition> partitions = splitManager.getPartitions(tableHandle, Optional.<TupleDomain>absent()).getPartitions();
-            SplitSource splitSource = splitManager.getPartitionSplits(tableHandle, partitions);
+            List<Partition> partitions = splitManager.getPartitions(tableHandle, Optional.<TupleDomain>absent(), null).getPartitions();
+            SplitSource splitSource = splitManager.getPartitionSplits(tableHandle, partitions, null);
             Split split = Iterables.getOnlyElement(splitSource.getNextBatch(1000));
             checkState(splitSource.isFinished(), "Expected only one split for a local query");
             return split;

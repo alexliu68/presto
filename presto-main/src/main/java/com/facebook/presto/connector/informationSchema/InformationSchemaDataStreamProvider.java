@@ -218,7 +218,8 @@ public class InformationSchemaDataStreamProvider
         Optional<TableHandle> tableHandle = metadata.getTableHandle(tableName);
         checkArgument(tableHandle.isPresent(), "Table %s does not exist", tableName);
         Map<ColumnHandle, String> columnHandles = ImmutableBiMap.copyOf(metadata.getColumnHandles(tableHandle.get())).inverse();
-        PartitionResult partitionResult = splitManager.getPartitions(tableHandle.get(), Optional.<TupleDomain>absent());
+        // We can't get the hints, so the partitions may be different from real execution with hints
+        PartitionResult partitionResult = splitManager.getPartitions(tableHandle.get(), Optional.<TupleDomain>absent(), null);
 
         for (Partition partition : partitionResult.getPartitions()) {
             for (Entry<ColumnHandle, Comparable<?>> entry : partition.getTupleDomain().extractFixedValues().entrySet()) {

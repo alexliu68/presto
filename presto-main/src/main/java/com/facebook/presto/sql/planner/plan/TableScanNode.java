@@ -49,6 +49,7 @@ public class TableScanNode
     private final Optional<GeneratedPartitions> generatedPartitions;
     private final boolean partitionsDroppedBySerialization;
     private final TupleDomain partitionDomainSummary;
+    private final Optional<Map<String, String>> hints;
 
     // HACK!
     //
@@ -61,9 +62,9 @@ public class TableScanNode
     // In this way, we are always guaranteed to have a readable predicate that provides some kind of upper bound on the constraints.
     private final Expression originalConstraint;
 
-    public TableScanNode(PlanNodeId id, TableHandle table, List<Symbol> outputSymbols, Map<Symbol, ColumnHandle> assignments, @Nullable Expression originalConstraint, Optional<GeneratedPartitions> generatedPartitions)
+    public TableScanNode(PlanNodeId id, TableHandle table, List<Symbol> outputSymbols, Map<Symbol, ColumnHandle> assignments, @Nullable Expression originalConstraint, Optional<GeneratedPartitions> generatedPartitions, Optional<Map<String, String>> hints)
     {
-        this(id, table, outputSymbols, assignments, originalConstraint, generatedPartitions, false);
+        this(id, table, outputSymbols, assignments, originalConstraint, generatedPartitions, false, hints);
     }
 
     @JsonCreator
@@ -73,10 +74,10 @@ public class TableScanNode
             @JsonProperty("assignments") Map<Symbol, ColumnHandle> assignments,
             @JsonProperty("originalConstraint") @Nullable Expression originalConstraint)
     {
-        this(id, table, outputSymbols, assignments, originalConstraint, Optional.<GeneratedPartitions>absent(), true);
+        this(id, table, outputSymbols, assignments, originalConstraint, Optional.<GeneratedPartitions>absent(), true, Optional.<Map<String, String>>absent());
     }
 
-    private TableScanNode(PlanNodeId id, TableHandle table, List<Symbol> outputSymbols, Map<Symbol, ColumnHandle> assignments, @Nullable Expression originalConstraint, Optional<GeneratedPartitions> generatedPartitions, boolean partitionsDroppedBySerialization)
+    private TableScanNode(PlanNodeId id, TableHandle table, List<Symbol> outputSymbols, Map<Symbol, ColumnHandle> assignments, @Nullable Expression originalConstraint, Optional<GeneratedPartitions> generatedPartitions, boolean partitionsDroppedBySerialization, Optional<Map<String, String>> hints)
     {
         super(id);
 
@@ -86,12 +87,14 @@ public class TableScanNode
         checkArgument(assignments.keySet().containsAll(outputSymbols), "assignments does not cover all of outputSymbols");
         checkArgument(!assignments.isEmpty(), "assignments is empty");
         checkNotNull(generatedPartitions, "generatedPartitions is null");
+        checkNotNull(hints, "hints is null");
 
         this.table = table;
         this.outputSymbols = ImmutableList.copyOf(outputSymbols);
         this.assignments = ImmutableMap.copyOf(assignments);
         this.originalConstraint = originalConstraint;
         this.generatedPartitions = generatedPartitions;
+        this.hints = hints;
         this.partitionsDroppedBySerialization = partitionsDroppedBySerialization;
         this.partitionDomainSummary = computePartitionsDomainSummary(generatedPartitions);
         checkArgument(partitionDomainSummary.isNone() || assignments.values().containsAll(partitionDomainSummary.getDomains().keySet()), "Assignments do not include all of the ColumnHandles specified by the Partitions");
@@ -120,6 +123,11 @@ public class TableScanNode
     public Expression getOriginalConstraint()
     {
         return originalConstraint;
+    }
+
+    public Optional<Map<String, String>> getHints()
+    {
+        return hints;
     }
 
     public Optional<GeneratedPartitions> getGeneratedPartitions()

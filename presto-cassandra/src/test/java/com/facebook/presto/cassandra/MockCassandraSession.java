@@ -120,18 +120,18 @@ public class MockCassandraSession
     }
 
     @Override
-    public List<CassandraPartition> getPartitions(CassandraTable table, List<Comparable<?>> filterPrefix)
+    public List<CassandraPartition> getPartitions(CassandraTable table, List<Comparable<?>> filterPrefix, int limitForSelect, int fetchSizeForSelect)
     {
         accessCount.incrementAndGet();
         if (throwException) {
             throw new IllegalStateException();
         }
 
-        return super.getPartitions(table, filterPrefix);
+        return super.getPartitions(table, filterPrefix, limitForSelect, fetchSizeForSelect);
     }
 
     @Override
-    protected List<Row> queryPartitionKeys(CassandraTable table, List<Comparable<?>> filterPrefix)
+    protected List<Row> queryPartitionKeys(CassandraTable table, List<Comparable<?>> filterPrefix, int limitForSelect, int fetchSizeForSelect)
     {
         CassandraTableHandle tableHandle = table.getTableHandle();
         if (tableHandle.getSchemaName().equals(TEST_SCHEMA) && tableHandle.getTableName().equals(TEST_TABLE)) {

@@ -57,7 +57,7 @@ public class CassandraClientConfig
         return limitForPartitionKeySelect;
     }
 
-    @Config("cassandra.limit-for-partition-key-select")
+    @Config("cassandra.limit_for_partition_key_select")
     public CassandraClientConfig setLimitForPartitionKeySelect(int limitForPartitionKeySelect)
     {
         this.limitForPartitionKeySelect = limitForPartitionKeySelect;
@@ -70,7 +70,7 @@ public class CassandraClientConfig
         return maxSchemaRefreshThreads;
     }
 
-    @Config("cassandra.max-schema-refresh-threads")
+    @Config("cassandra.max_schema_refresh_threads")
     public CassandraClientConfig setMaxSchemaRefreshThreads(int maxSchemaRefreshThreads)
     {
         this.maxSchemaRefreshThreads = maxSchemaRefreshThreads;
@@ -83,7 +83,7 @@ public class CassandraClientConfig
         return schemaCacheTtl;
     }
 
-    @Config("cassandra.schema-cache-ttl")
+    @Config("cassandra.schema_cache_ttl")
     public CassandraClientConfig setSchemaCacheTtl(Duration schemaCacheTtl)
     {
         this.schemaCacheTtl = schemaCacheTtl;
@@ -96,7 +96,7 @@ public class CassandraClientConfig
         return schemaRefreshInterval;
     }
 
-    @Config("cassandra.schema-refresh-interval")
+    @Config("cassandra.schema_refresh_interval")
     public CassandraClientConfig setSchemaRefreshInterval(Duration schemaRefreshInterval)
     {
         this.schemaRefreshInterval = schemaRefreshInterval;
@@ -110,7 +110,7 @@ public class CassandraClientConfig
         return contactPoints;
     }
 
-    @Config("cassandra.contact-points")
+    @Config("cassandra.contact_points")
     public CassandraClientConfig setContactPoints(String commaSeparatedList)
     {
         this.contactPoints = SPLITTER.splitToList(commaSeparatedList);
@@ -129,7 +129,7 @@ public class CassandraClientConfig
         return nativeProtocolPort;
     }
 
-    @Config(("cassandra.native-protocol-port"))
+    @Config(("cassandra.native_protocol_port"))
     public CassandraClientConfig setNativeProtocolPort(int nativeProtocolPort)
     {
         this.nativeProtocolPort = nativeProtocolPort;
@@ -142,7 +142,7 @@ public class CassandraClientConfig
         return consistencyLevel;
     }
 
-    @Config("cassandra.consistency-level")
+    @Config("cassandra.consistency_level")
     public CassandraClientConfig setConsistencyLevel(ConsistencyLevel level)
     {
         this.consistencyLevel = level;
@@ -155,7 +155,7 @@ public class CassandraClientConfig
         return fetchSize;
     }
 
-    @Config("cassandra.fetch-size")
+    @Config("cassandra.fetch_size")
     public CassandraClientConfig setFetchSize(int fetchSize)
     {
         this.fetchSize = fetchSize;
@@ -168,7 +168,7 @@ public class CassandraClientConfig
         return fetchSizeForPartitionKeySelect;
     }
 
-    @Config("cassandra.fetch-size-for-partition-key-select")
+    @Config("cassandra.fetch_size_for_partition_key_select")
     public CassandraClientConfig setFetchSizeForPartitionKeySelect(int fetchSizeForPartitionKeySelect)
     {
         this.fetchSizeForPartitionKeySelect = fetchSizeForPartitionKeySelect;
@@ -181,7 +181,7 @@ public class CassandraClientConfig
         return thriftPort;
     }
 
-    @Config(("cassandra.thrift-port"))
+    @Config(("cassandra.thrift_port"))
     public CassandraClientConfig setThriftPort(int thriftPort)
     {
         this.thriftPort = thriftPort;
@@ -194,7 +194,7 @@ public class CassandraClientConfig
         return splitSize;
     }
 
-    @Config("cassandra.split-size")
+    @Config("cassandra.split_size")
     public CassandraClientConfig setSplitSize(int splitSize)
     {
         this.splitSize = splitSize;
@@ -218,7 +218,7 @@ public class CassandraClientConfig
         return thriftConnectionFactoryClassName;
     }
 
-    @Config("cassandra.thrift-connection-factory-class")
+    @Config("cassandra.thrift_connection_factory_class")
     public CassandraClientConfig setThriftConnectionFactoryClassName(String thriftConnectionFactoryClassName)
     {
         this.thriftConnectionFactoryClassName = thriftConnectionFactoryClassName;
@@ -230,7 +230,7 @@ public class CassandraClientConfig
         return transportFactoryOptions;
     }
 
-    @Config("cassandra.transport-factory-options")
+    @Config("cassandra.transport_factory_options")
     public CassandraClientConfig setTransportFactoryOptions(String transportFactoryOptions)
     {
         Map<String, String> tfOptions = Maps.newHashMap();
@@ -252,7 +252,7 @@ public class CassandraClientConfig
         return partitionSizeForBatchSelect;
     }
 
-    @Config("cassandra.partition-size-for-batch-select")
+    @Config("cassandra.partition_size_for_batch_select")
     public CassandraClientConfig setPartitionSizeForBatchSelect(int partitionSizeForBatchSelect)
     {
         this.partitionSizeForBatchSelect = partitionSizeForBatchSelect;

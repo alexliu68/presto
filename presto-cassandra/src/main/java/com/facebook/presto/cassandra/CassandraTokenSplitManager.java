@@ -61,7 +61,7 @@ public class CassandraTokenSplitManager
         }
     }
 
-    public List<TokenSplit> getSplits(String ks, String cf) throws IOException
+    public List<TokenSplit> getSplits(String ks, String cf, int splitsize) throws IOException
     {
         List<TokenRange> masterRangeNodes = getRangeMap(ks, client);
 
@@ -72,7 +72,10 @@ public class CassandraTokenSplitManager
             List<Future<List<TokenSplit>>> splitfutures = new ArrayList<Future<List<TokenSplit>>>();
             for (TokenRange range : masterRangeNodes) {
                 // for each range, pick a live owner and ask it to compute bite-sized splits
-                splitfutures.add(executor.submit(new SplitCallable(range, ks, cf, splitSize, client, partitioner)));
+                if (splitsize < 0) {
+                    splitsize = splitSize;
+                }
+                splitfutures.add(executor.submit(new SplitCallable(range, ks, cf, splitsize, client, partitioner)));
             }
 
             // wait until we have all the results back

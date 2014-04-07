@@ -14,6 +14,7 @@
 package com.facebook.presto.spi;
 
 import java.util.List;
+import java.util.Map;
 
 public interface ConnectorSplitManager
 {
@@ -34,10 +35,10 @@ public interface ConnectorSplitManager
      * data stream produced by this connector. Connectors are encouraged to take advantage of
      * this information to perform connector-specific optimizations.
      */
-    PartitionResult getPartitions(TableHandle table, TupleDomain tupleDomain);
+    PartitionResult getPartitions(TableHandle table, TupleDomain tupleDomain, Map<String, String> hints);
 
     /**
      * Gets the Splits for the specified Partitions in the indicated table.
      */
-    SplitSource getPartitionSplits(TableHandle table, List<Partition> partitions);
+    SplitSource getPartitionSplits(TableHandle table, List<Partition> partitions, Map<String, String> hints);
 }

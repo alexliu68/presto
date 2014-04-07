@@ -87,7 +87,7 @@ public class DistributedExecutionPlanner
         public Optional<SplitSource> visitTableScan(TableScanNode node, Void context)
         {
             // get dataSource for table
-            SplitSource splitSource = splitManager.getPartitionSplits(node.getTable(), getPartitions(node));
+            SplitSource splitSource = splitManager.getPartitionSplits(node.getTable(), getPartitions(node), node.getHints().orNull());
 
             return Optional.of(splitSource);
         }
@@ -97,8 +97,7 @@ public class DistributedExecutionPlanner
             if (node.getGeneratedPartitions().isPresent()) {
                 return node.getGeneratedPartitions().get().getPartitions();
             }
-
-            PartitionResult allPartitions = splitManager.getPartitions(node.getTable(), Optional.<TupleDomain>absent());
+            PartitionResult allPartitions = splitManager.getPartitions(node.getTable(), Optional.<TupleDomain>absent(), node.getHints().orNull());
             return allPartitions.getPartitions();
         }
 

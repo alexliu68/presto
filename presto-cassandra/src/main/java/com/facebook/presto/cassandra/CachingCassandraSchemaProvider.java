@@ -268,7 +268,7 @@ public class CachingCassandraSchemaProvider
                 });
     }
 
-    public List<CassandraPartition> getPartitions(CassandraTable table, List<Comparable<?>> filterPrefix)
+    public List<CassandraPartition> getPartitions(CassandraTable table, List<Comparable<?>> filterPrefix, int limitForPartitionKeySelect, int fetchSizeForPartitionKeySelect)
     {
         LoadingCache<PartitionListKey, List<CassandraPartition>> cache;
         if (filterPrefix.size() == table.getPartitionKeyColumns().size()) {
@@ -277,7 +277,7 @@ public class CachingCassandraSchemaProvider
         else {
             cache = partitionsCache;
         }
-        PartitionListKey key = new PartitionListKey(table, filterPrefix);
+        PartitionListKey key = new PartitionListKey(table, filterPrefix, limitForPartitionKeySelect, fetchSizeForPartitionKeySelect);
         return getCacheValue(cache, key, RuntimeException.class);
     }
 
@@ -290,7 +290,7 @@ public class CachingCassandraSchemaProvider
                     @Override
                     public List<CassandraPartition> call()
                     {
-                        return session.getPartitions(key.getTable(), key.getFilterPrefix());
+                        return session.getPartitions(key.getTable(), key.getFilterPrefix(), key.getLimitForPartitionKeySelect(), key.getFetchSizeForPartitionKeySelect());
                     }
                 });
     }
@@ -323,11 +323,15 @@ public class CachingCassandraSchemaProvider
     {
         private final CassandraTable table;
         private final List<Comparable<?>> filterPrefix;
+        private final int limitForPartitionKeySelect;
+        private final int fetchSizeForPartitionKeySelect;
 
-        PartitionListKey(CassandraTable table, List<Comparable<?>> filterPrefix)
+        PartitionListKey(CassandraTable table, List<Comparable<?>> filterPrefix, int limitForPartitionKeySelect, int fetchSizeForPartitionKeySelect)
         {
             this.table = table;
             this.filterPrefix = ImmutableList.copyOf(filterPrefix);
+            this.limitForPartitionKeySelect = limitForPartitionKeySelect;
+            this.fetchSizeForPartitionKeySelect = fetchSizeForPartitionKeySelect;
         }
 
         public List<Comparable<?>> getFilterPrefix()
@@ -357,6 +361,16 @@ public class CachingCassandraSchemaProvider
             }
             PartitionListKey other = (PartitionListKey) obj;
             return Objects.equal(this.table, other.table) && Objects.equal(this.filterPrefix, other.filterPrefix);
+        }
+
+        public int getLimitForPartitionKeySelect()
+        {
+            return limitForPartitionKeySelect;
+        }
+
+        public int getFetchSizeForPartitionKeySelect()
+        {
+            return fetchSizeForPartitionKeySelect;
         }
     }
 }

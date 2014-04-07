@@ -31,6 +31,9 @@ tokens {
     WITH_LIST;
     WITH_QUERY;
     ALL_COLUMNS;
+    HINT_LIST;
+    HINT_ITEM;
+    HINT_KEY;
     SELECT_LIST;
     SELECT_ITEM;
     ALIASED_COLUMNS;
@@ -227,7 +230,24 @@ withClause
     ;
 
 selectClause
-    : SELECT selectExpr -> ^(SELECT selectExpr)
+    : SELECT (HINT_START hintList HINT_END)? selectExpr -> ^(SELECT hintList? selectExpr)
+    ;
+
+
+hintList
+    : hintSublist (',' hintSublist)* -> ^(HINT_LIST hintSublist+)
+    ;
+
+hintSublist
+    : hintKey '=' hintValue -> ^(HINT_ITEM hintKey hintValue )
+    ;
+
+hintKey
+    : qname -> ^(HINT_KEY qname)
+    ;
+
+hintValue
+    : INTEGER_VALUE
     ;
 
 fromClause
@@ -815,6 +835,8 @@ POISSONIZED: 'POISSONIZED';
 TABLESAMPLE: 'TABLESAMPLE';
 RESCALED: 'RESCALED';
 STRATIFY: 'STRATIFY';
+HINT_START: '/!';
+HINT_END: '!/';
 
 EQ  : '=';
 NEQ : '<>' | '!=';
@@ -880,4 +902,8 @@ COMMENT
 
 WS
     : (' ' | '\t' | '\n' | '\r')+ { $channel=HIDDEN; }
+    ;
+
+HINT_KEY
+    : ('split_size' | 'partition_size_for_batch_select' | 'fetch_size_for_partition_key_select' | 'limit_for_partition_key_select')
     ;

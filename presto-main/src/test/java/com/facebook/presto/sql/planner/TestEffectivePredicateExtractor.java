@@ -110,7 +110,8 @@ public class TestEffectivePredicateExtractor
                 ImmutableList.copyOf(assignments.keySet()),
                 assignments,
                 null,
-                Optional.<GeneratedPartitions>absent()
+                Optional.<GeneratedPartitions>absent(),
+                Optional.<Map<String, String>>absent()
         );
 
         expressionNormalizer = new ExpressionIdentityNormalizer();
@@ -291,7 +292,8 @@ public class TestEffectivePredicateExtractor
                 ImmutableList.copyOf(assignments.keySet()),
                 assignments,
                 null,
-                Optional.<GeneratedPartitions>absent());
+                Optional.<GeneratedPartitions>absent(),
+                Optional.<Map<String, String>>absent());
         Expression effectivePredicate = EffectivePredicateExtractor.extract(node);
         Assert.assertEquals(effectivePredicate, BooleanLiteral.TRUE_LITERAL);
 
@@ -304,7 +306,8 @@ public class TestEffectivePredicateExtractor
                 null,
                 Optional.<GeneratedPartitions>of(new GeneratedPartitions(
                         TupleDomain.withColumnDomains(ImmutableMap.<ColumnHandle, Domain>of(scanAssignments.get(A), Domain.singleValue(1L))),
-                        ImmutableList.<Partition>of())));
+                        ImmutableList.<Partition>of())),
+                Optional.<Map<String, String>>absent());
         effectivePredicate = EffectivePredicateExtractor.extract(node);
         Assert.assertEquals(effectivePredicate, BooleanLiteral.FALSE_LITERAL);
 
@@ -317,7 +320,8 @@ public class TestEffectivePredicateExtractor
                 null,
                 Optional.<GeneratedPartitions>of(new GeneratedPartitions(
                         TupleDomain.withColumnDomains(ImmutableMap.<ColumnHandle, Domain>of(scanAssignments.get(A), Domain.singleValue(1L))),
-                        ImmutableList.<Partition>of(new DualPartition()))));
+                        ImmutableList.<Partition>of(new DualPartition()))),
+                Optional.<Map<String, String>>absent());
         effectivePredicate = EffectivePredicateExtractor.extract(node);
         Assert.assertEquals(normalizeConjuncts(effectivePredicate), normalizeConjuncts(equals(number(1L), AE)));
 
@@ -332,7 +336,8 @@ public class TestEffectivePredicateExtractor
                         TupleDomain.withColumnDomains(ImmutableMap.<ColumnHandle, Domain>of(scanAssignments.get(A), Domain.singleValue(1L))),
                         ImmutableList.<Partition>of(tupleDomainPartition(TupleDomain.withColumnDomains(ImmutableMap.<ColumnHandle, Domain>of(
                                 scanAssignments.get(A), Domain.singleValue(1L),
-                                scanAssignments.get(B), Domain.singleValue(2L))))))));
+                                scanAssignments.get(B), Domain.singleValue(2L))))))),
+                Optional.<Map<String, String>>absent());
         effectivePredicate = EffectivePredicateExtractor.extract(node);
         Assert.assertEquals(normalizeConjuncts(effectivePredicate), normalizeConjuncts(equals(number(2L), BE), equals(number(1L), AE)));
 
@@ -345,7 +350,8 @@ public class TestEffectivePredicateExtractor
                 null,
                 Optional.<GeneratedPartitions>of(new GeneratedPartitions(
                         TupleDomain.all(),
-                        ImmutableList.<Partition>of())));
+                        ImmutableList.<Partition>of())),
+                Optional.<Map<String, String>>absent());
         effectivePredicate = EffectivePredicateExtractor.extract(node);
         Assert.assertEquals(effectivePredicate, BooleanLiteral.FALSE_LITERAL);
 
@@ -358,7 +364,8 @@ public class TestEffectivePredicateExtractor
                 null,
                 Optional.<GeneratedPartitions>of(new GeneratedPartitions(
                         TupleDomain.all(),
-                        ImmutableList.<Partition>of(new DualPartition()))));
+                        ImmutableList.<Partition>of(new DualPartition()))),
+                Optional.<Map<String, String>>absent());
         effectivePredicate = EffectivePredicateExtractor.extract(node);
         Assert.assertEquals(effectivePredicate, BooleanLiteral.TRUE_LITERAL);
 
@@ -373,7 +380,8 @@ public class TestEffectivePredicateExtractor
                         TupleDomain.all(),
                         ImmutableList.<Partition>of(tupleDomainPartition(TupleDomain.withColumnDomains(ImmutableMap.<ColumnHandle, Domain>of(
                                 scanAssignments.get(A), Domain.singleValue(1L),
-                                scanAssignments.get(B), Domain.singleValue(2L))))))));
+                                scanAssignments.get(B), Domain.singleValue(2L))))))),
+                Optional.<Map<String, String>>absent());
         effectivePredicate = EffectivePredicateExtractor.extract(node);
         Assert.assertEquals(normalizeConjuncts(effectivePredicate), normalizeConjuncts(equals(number(2L), BE), equals(number(1L), AE)));
 
@@ -390,7 +398,8 @@ public class TestEffectivePredicateExtractor
                                 scanAssignments.get(D), Domain.singleValue(3L))),
                         ImmutableList.<Partition>of(tupleDomainPartition(TupleDomain.withColumnDomains(ImmutableMap.<ColumnHandle, Domain>of(
                                 scanAssignments.get(A), Domain.singleValue(1L),
-                                scanAssignments.get(C), Domain.singleValue(2L))))))));
+                                scanAssignments.get(C), Domain.singleValue(2L))))))),
+                Optional.<Map<String, String>>absent());
         effectivePredicate = EffectivePredicateExtractor.extract(node);
         Assert.assertEquals(normalizeConjuncts(effectivePredicate), normalizeConjuncts(equals(number(1L), AE)));
     }
@@ -449,7 +458,8 @@ public class TestEffectivePredicateExtractor
                 ImmutableList.copyOf(leftAssignments.keySet()),
                 leftAssignments,
                 null,
-                Optional.<GeneratedPartitions>absent()
+                Optional.<GeneratedPartitions>absent(),
+                Optional.<Map<String, String>>absent()
         );
 
         Map<Symbol, ColumnHandle> rightAssignments = Maps.filterKeys(scanAssignments, Predicates.in(ImmutableList.of(D, E, F)));
@@ -459,7 +469,8 @@ public class TestEffectivePredicateExtractor
                 ImmutableList.copyOf(rightAssignments.keySet()),
                 rightAssignments,
                 null,
-                Optional.<GeneratedPartitions>absent()
+                Optional.<GeneratedPartitions>absent(),
+                Optional.<Map<String, String>>absent()
         );
 
         PlanNode node = new JoinNode(newId(),
@@ -502,7 +513,8 @@ public class TestEffectivePredicateExtractor
                 ImmutableList.copyOf(leftAssignments.keySet()),
                 leftAssignments,
                 null,
-                Optional.<GeneratedPartitions>absent()
+                Optional.<GeneratedPartitions>absent(),
+                Optional.<Map<String, String>>absent()
         );
 
         Map<Symbol, ColumnHandle> rightAssignments = Maps.filterKeys(scanAssignments, Predicates.in(ImmutableList.of(D, E, F)));
@@ -512,7 +524,8 @@ public class TestEffectivePredicateExtractor
                 ImmutableList.copyOf(rightAssignments.keySet()),
                 rightAssignments,
                 null,
-                Optional.<GeneratedPartitions>absent()
+                Optional.<GeneratedPartitions>absent(),
+                Optional.<Map<String, String>>absent()
         );
 
         PlanNode node = new JoinNode(newId(),
@@ -555,7 +568,8 @@ public class TestEffectivePredicateExtractor
                 ImmutableList.copyOf(leftAssignments.keySet()),
                 leftAssignments,
                 null,
-                Optional.<GeneratedPartitions>absent()
+                Optional.<GeneratedPartitions>absent(),
+                Optional.<Map<String, String>>absent()
         );
 
         Map<Symbol, ColumnHandle> rightAssignments = Maps.filterKeys(scanAssignments, Predicates.in(ImmutableList.of(D, E, F)));
@@ -565,7 +579,8 @@ public class TestEffectivePredicateExtractor
                 ImmutableList.copyOf(rightAssignments.keySet()),
                 rightAssignments,
                 null,
-                Optional.<GeneratedPartitions>absent()
+                Optional.<GeneratedPartitions>absent(),
+                Optional.<Map<String, String>>absent()
         );
 
         PlanNode node = new JoinNode(newId(),

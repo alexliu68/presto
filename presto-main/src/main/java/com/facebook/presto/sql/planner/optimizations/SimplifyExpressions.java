@@ -98,7 +98,7 @@ public class SimplifyExpressions
             if (node.getOriginalConstraint() != null) {
                 originalConstraint = simplifyExpression(node.getOriginalConstraint());
             }
-            return new TableScanNode(node.getId(), node.getTable(), node.getOutputSymbols(), node.getAssignments(), originalConstraint, node.getGeneratedPartitions());
+            return new TableScanNode(node.getId(), node.getTable(), node.getOutputSymbols(), node.getAssignments(), originalConstraint, node.getGeneratedPartitions(), node.getHints());
         }
 
         private Function<Expression, Expression> simplifyExpressionFunction()

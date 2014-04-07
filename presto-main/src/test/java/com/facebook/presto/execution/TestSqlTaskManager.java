@@ -63,6 +63,7 @@ import org.testng.annotations.Test;
 
 import java.io.File;
 import java.net.URI;
+import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.concurrent.TimeUnit;
 
@@ -105,9 +106,9 @@ public class TestSqlTaskManager
         metadata.addInternalSchemaMetadata(MetadataManager.INTERNAL_CONNECTOR_ID, dualMetadata);
 
         DualSplitManager dualSplitManager = new DualSplitManager(new InMemoryNodeManager());
-        PartitionResult partitionResult = dualSplitManager.getPartitions(tableHandle, TupleDomain.all());
+        PartitionResult partitionResult = dualSplitManager.getPartitions(tableHandle, TupleDomain.all(), null);
 
-        SplitSource splitSource = dualSplitManager.getPartitionSplits(tableHandle, partitionResult.getPartitions());
+        SplitSource splitSource = dualSplitManager.getPartitionSplits(tableHandle, partitionResult.getPartitions(), null);
         split = Iterables.getOnlyElement(splitSource.getNextBatch(1));
         assertTrue(splitSource.isFinished());
 
@@ -139,7 +140,8 @@ public class TestSqlTaskManager
                         ImmutableList.of(symbol),
                         ImmutableMap.of(symbol, columnHandle),
                         null,
-                        Optional.<GeneratedPartitions>absent()),
+                        Optional.<GeneratedPartitions>absent(),
+                        Optional.<Map<String, String>>absent()),
                 ImmutableMap.<Symbol, Type>of(symbol, Type.VARCHAR),
                 PlanDistribution.SOURCE,
                 tableScanNodeId,

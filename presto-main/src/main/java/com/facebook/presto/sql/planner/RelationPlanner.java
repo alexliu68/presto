@@ -130,7 +130,7 @@ class RelationPlanner
         }
 
         List<Symbol> nodeOutputSymbols = outputSymbolsBuilder.build();
-        PlanNode root = new TableScanNode(idAllocator.getNextId(), handle, nodeOutputSymbols, columns.build(), null, Optional.<GeneratedPartitions>absent());
+        PlanNode root = new TableScanNode(idAllocator.getNextId(), handle, nodeOutputSymbols, columns.build(), null, Optional.<GeneratedPartitions>absent(), analysis.getHints());
         if (sampleWeightSymbol != null) {
             root = new MaterializeSampleNode(idAllocator.getNextId(), root, sampleWeightSymbol);
         }

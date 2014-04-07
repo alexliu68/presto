@@ -14,6 +14,7 @@
 package com.facebook.presto.sql.tree;
 
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.Maps;
 
 import java.util.List;
 
@@ -42,17 +43,17 @@ public final class QueryUtil
         for (Expression expression : expressions) {
             items.add(new SingleColumn(expression));
         }
-        return new Select(false, items.build());
+        return new Select(false, items.build(), Maps.<String, String>newHashMap());
     }
 
     public static Select selectList(SelectItem... items)
     {
-        return new Select(false, ImmutableList.copyOf(items));
+        return new Select(false, ImmutableList.copyOf(items), Maps.<String, String>newHashMap());
     }
 
     public static Select selectAll(List<SelectItem> items)
     {
-        return new Select(false, items);
+        return new Select(false, items, Maps.<String, String>newHashMap());
     }
 
     public static List<Relation> table(QualifiedName name)

@@ -622,7 +622,7 @@ public class HiveClient
     }
 
     @Override
-    public PartitionResult getPartitions(TableHandle tableHandle, TupleDomain tupleDomain)
+    public PartitionResult getPartitions(TableHandle tableHandle, TupleDomain tupleDomain, Map<String, String> hints)
     {
         checkNotNull(tableHandle, "tableHandle is null");
         checkNotNull(tupleDomain, "tupleDomain is null");
@@ -705,7 +705,7 @@ public class HiveClient
     }
 
     @Override
-    public SplitSource getPartitionSplits(TableHandle tableHandle, List<Partition> partitions)
+    public SplitSource getPartitionSplits(TableHandle tableHandle, List<Partition> partitions, Map<String, String> hints)
     {
         checkNotNull(partitions, "partitions is null");
 

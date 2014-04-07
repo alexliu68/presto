@@ -163,7 +163,24 @@ withQuery returns [WithQuery value]
     ;
 
 selectClause returns [Select value]
-    : ^(SELECT d=distinct[false] s=selectList) { $value = new Select($d.value, $s.value); }
+    : ^(SELECT h=hints d=distinct[false] s=selectList) { $value = new Select($d.value, $s.value, $h.value); }
+    ;
+
+hints returns [Map<String, String> value = new HashMap<>()]
+    : ^(HINT_LIST ( hintItem { $value.putAll($hintItem.value); } )+ )
+    | {}
+    ;
+
+hintItem returns [Map<String, String> value = new HashMap<>()]
+    : ^(HINT_ITEM hintKey hintValue)  { $value.put($hintKey.value, $hintValue.value); }
+    ;
+
+hintKey returns [String value]
+    : ^(HINT_KEY qname) { $value = $qname.value.toString(); }
+    ;
+
+hintValue returns [String value]
+    : s=INTEGER_VALUE { $value = $s.text; }
     ;
 
 distinct[boolean defaultValue] returns [boolean value]

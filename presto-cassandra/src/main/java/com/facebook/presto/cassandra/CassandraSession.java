@@ -184,9 +184,9 @@ public class CassandraSession
         return new CassandraColumnHandle(connectorId, columnMeta.getName(), index, cassandraType, typeArguments, partitionKey, clusteringKey, indexed);
     }
 
-    public List<CassandraPartition> getPartitions(CassandraTable table, List<Comparable<?>> filterPrefix)
+    public List<CassandraPartition> getPartitions(CassandraTable table, List<Comparable<?>> filterPrefix, int limitForSelect, int fetchSizeForSelect)
     {
-        Iterable<Row> rows = queryPartitionKeys(table, filterPrefix);
+        Iterable<Row> rows = queryPartitionKeys(table, filterPrefix, limitForSelect, fetchSizeForSelect);
         if (rows == null) {
             // just split the whole partition range
             return ImmutableList.of(CassandraPartition.UNPARTITIONED);
@@ -240,14 +240,20 @@ public class CassandraSession
         return partitions.build();
     }
 
-    protected Iterable<Row> queryPartitionKeys(CassandraTable table, List<Comparable<?>> filterPrefix)
+    protected Iterable<Row> queryPartitionKeys(CassandraTable table, List<Comparable<?>> filterPrefix, int limitForSelect, int fetchSizeForSelect)
     {
+        if (limitForSelect < 0) {
+            limitForSelect = limitForPartitionKeySelect;
+        }
+        if (fetchSizeForSelect < 0) {
+            fetchSizeForSelect = fetchSizeForPartitionKeySelect;
+        }
         CassandraTableHandle tableHandle = table.getTableHandle();
         List<CassandraColumnHandle> partitionKeyColumns = table.getPartitionKeyColumns();
         boolean fullPartitionKey = filterPrefix.size() == partitionKeyColumns.size();
         ResultSetFuture countFuture;
         if (!fullPartitionKey) {
-            Select countAll = CassandraCqlUtils.selectCountAllFrom(tableHandle).limit(limitForPartitionKeySelect);
+            Select countAll = CassandraCqlUtils.selectCountAllFrom(tableHandle).limit(limitForSelect);
             countFuture = session.executeAsync(countAll);
         }
         else {
@@ -255,16 +261,15 @@ public class CassandraSession
             countFuture = null;
         }
 
-        int limit = fullPartitionKey ? 1 : limitForPartitionKeySelect;
+        int limit = fullPartitionKey ? 1 : limitForSelect;
         Select partitionKeys = CassandraCqlUtils.selectDistinctFrom(tableHandle, partitionKeyColumns);
         partitionKeys.limit(limit);
-        partitionKeys.setFetchSize(fetchSizeForPartitionKeySelect);
-
+        partitionKeys.setFetchSize(fetchSizeForSelect);
         if (!fullPartitionKey) {
             addWhereClause(partitionKeys.where(), partitionKeyColumns, new ArrayList<Comparable<?>>());
             ResultSetFuture partitionKeyFuture = session.executeAsync(partitionKeys);
             long count = countFuture.getUninterruptibly().one().getLong(0);
-            if (count == limitForPartitionKeySelect) {
+            if (count == limitForSelect) {
                 partitionKeyFuture.cancel(true);
                 return null; // too much effort to query all partition keys
             }

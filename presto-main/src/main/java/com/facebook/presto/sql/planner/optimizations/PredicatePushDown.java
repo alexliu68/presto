@@ -783,7 +783,7 @@ public class PredicatePushDown
             }
 
             Stopwatch partitionTimer = Stopwatch.createStarted();
-            PartitionResult matchingPartitions = splitManager.getPartitions(node.getTable(), Optional.of(tupleDomain));
+            PartitionResult matchingPartitions = splitManager.getPartitions(node.getTable(), Optional.of(tupleDomain), node.getHints().orNull());
             List<Partition> partitions = matchingPartitions.getPartitions();
             TupleDomain undeterminedTupleDomain = matchingPartitions.getUndeterminedTupleDomain();
             log.debug("Partition retrieval, table %s (%d partitions): %dms", node.getTable(), partitions.size(), partitionTimer.elapsed(TimeUnit.MILLISECONDS));
@@ -801,7 +801,7 @@ public class PredicatePushDown
             if (!node.getGeneratedPartitions().equals(Optional.of(generatedPartitions))) {
                 // Only overwrite the originalConstraint if it was previously null
                 Expression originalConstraint = node.getOriginalConstraint() == null ? inheritedPredicate : node.getOriginalConstraint();
-                output = new TableScanNode(node.getId(), node.getTable(), node.getOutputSymbols(), node.getAssignments(), originalConstraint, Optional.of(generatedPartitions));
+                output = new TableScanNode(node.getId(), node.getTable(), node.getOutputSymbols(), node.getAssignments(), originalConstraint, Optional.of(generatedPartitions), node.getHints());
             }
             if (!postScanPredicate.equals(BooleanLiteral.TRUE_LITERAL)) {
                 output = new FilterNode(idAllocator.getNextId(), output, postScanPredicate);

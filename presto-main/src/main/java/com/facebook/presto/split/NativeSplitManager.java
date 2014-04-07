@@ -90,7 +90,7 @@ public class NativeSplitManager
     }
 
     @Override
-    public PartitionResult getPartitions(TableHandle tableHandle, TupleDomain tupleDomain)
+    public PartitionResult getPartitions(TableHandle tableHandle, TupleDomain tupleDomain, Map<String, String> hints)
     {
         Stopwatch partitionTimer = new Stopwatch();
         partitionTimer.start();
@@ -118,7 +118,7 @@ public class NativeSplitManager
     }
 
     @Override
-    public SplitSource getPartitionSplits(TableHandle tableHandle, List<Partition> partitions)
+    public SplitSource getPartitionSplits(TableHandle tableHandle, List<Partition> partitions, Map<String, String> hints)
     {
         Stopwatch splitTimer = new Stopwatch();
         splitTimer.start();

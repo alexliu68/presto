@@ -29,6 +29,7 @@ import com.google.common.collect.Iterables;
 import javax.inject.Inject;
 
 import java.util.List;
+import java.util.Map;
 
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkNotNull;
@@ -58,7 +59,7 @@ public class DualSplitManager
     }
 
     @Override
-    public PartitionResult getPartitions(TableHandle table, TupleDomain tupleDomain)
+    public PartitionResult getPartitions(TableHandle table, TupleDomain tupleDomain, Map<String, String> hints)
     {
         checkNotNull(table, "table is null");
         checkNotNull(tupleDomain, "tupleDomain is null");
@@ -70,7 +71,7 @@ public class DualSplitManager
     }
 
     @Override
-    public SplitSource getPartitionSplits(TableHandle table, List<Partition> partitions)
+    public SplitSource getPartitionSplits(TableHandle table, List<Partition> partitions, Map<String, String> hints)
     {
         checkNotNull(partitions, "partitions is null");
         if (partitions.isEmpty()) {

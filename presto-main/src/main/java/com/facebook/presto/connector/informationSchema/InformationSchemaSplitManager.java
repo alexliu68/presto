@@ -63,7 +63,7 @@ public class InformationSchemaSplitManager
     }
 
     @Override
-    public PartitionResult getPartitions(TableHandle table, TupleDomain tupleDomain)
+    public PartitionResult getPartitions(TableHandle table, TupleDomain tupleDomain, Map<String, String> hints)
     {
         checkNotNull(table, "table is null");
         checkNotNull(tupleDomain, "tupleDomain is null");
@@ -80,7 +80,7 @@ public class InformationSchemaSplitManager
     }
 
     @Override
-    public SplitSource getPartitionSplits(TableHandle table, List<Partition> partitions)
+    public SplitSource getPartitionSplits(TableHandle table, List<Partition> partitions, Map<String, String> hints)
     {
         checkNotNull(partitions, "partitions is null");
         if (partitions.isEmpty()) {

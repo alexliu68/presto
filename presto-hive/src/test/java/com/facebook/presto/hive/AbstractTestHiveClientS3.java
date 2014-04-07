@@ -109,9 +109,9 @@ public abstract class AbstractTestHiveClientS3
         List<ColumnHandle> columnHandles = ImmutableList.copyOf(client.getColumnHandles(table).values());
         Map<String, Integer> columnIndex = indexColumns(columnHandles);
 
-        PartitionResult partitionResult = client.getPartitions(table, TupleDomain.all());
+        PartitionResult partitionResult = client.getPartitions(table, TupleDomain.all(), null);
         assertEquals(partitionResult.getPartitions().size(), 1);
-        SplitSource splitSource = client.getPartitionSplits(table, partitionResult.getPartitions());
+        SplitSource splitSource = client.getPartitionSplits(table, partitionResult.getPartitions(), null);
 
         long sum = 0;
         for (Split split : getAllSplits(splitSource)) {
@@ -194,9 +194,9 @@ public abstract class AbstractTestHiveClientS3
         List<ColumnHandle> columnHandles = ImmutableList.copyOf(client.getColumnHandles(tableHandle).values());
 
         // verify the data
-        PartitionResult partitionResult = client.getPartitions(tableHandle, TupleDomain.all());
+        PartitionResult partitionResult = client.getPartitions(tableHandle, TupleDomain.all(), null);
         assertEquals(partitionResult.getPartitions().size(), 1);
-        SplitSource splitSource = client.getPartitionSplits(tableHandle, partitionResult.getPartitions());
+        SplitSource splitSource = client.getPartitionSplits(tableHandle, partitionResult.getPartitions(), null);
         Split split = getOnlyElement(splitSource.getNextBatch(1000));
         assertTrue(splitSource.isFinished());
 

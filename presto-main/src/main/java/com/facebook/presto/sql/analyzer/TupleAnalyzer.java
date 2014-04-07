@@ -731,6 +731,7 @@ class TupleAnalyzer
 
         ImmutableList<FieldOrExpression> result = outputExpressionBuilder.build();
         analysis.setOutputExpressions(node, result);
+        analysis.setHints(node.getSelect().getHints());
 
         return result;
     }

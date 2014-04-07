@@ -31,6 +31,7 @@ import com.google.common.base.Objects;
 import com.google.common.base.Optional;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.HashMultimap;
+import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.SetMultimap;
 
@@ -74,6 +75,7 @@ public class Analysis
 
     // for create table
     private Optional<QualifiedTableName> createTableDestination = Optional.absent();
+    private Optional<Map<String, String>> hints = Optional.absent();
 
     public Query getQuery()
     {
@@ -304,6 +306,18 @@ public class Analysis
     {
         Preconditions.checkState(sampleRatios.containsKey(relation), "Sample ratio missing for %s. Broken analysis?", relation);
         return sampleRatios.get(relation);
+    }
+
+    public Optional<Map<String, String>> getHints()
+    {
+        return hints;
+    }
+
+    public void setHints(Map<String, String> hints)
+    {
+        if (hints.size() != 0) {
+            this.hints = Optional.of((Map<String, String>) ImmutableMap.<String, String>copyOf(hints));
+        }
     }
 
     public static class JoinInPredicates
