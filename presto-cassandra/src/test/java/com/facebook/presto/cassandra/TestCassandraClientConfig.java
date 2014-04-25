@@ -41,6 +41,7 @@ public class TestCassandraClientConfig
                 .setPartitioner("Murmur3Partitioner")
                 .setThriftPort(9160)
                 .setTransportFactoryOptions(null)
+                .setPartitionSizeForBatchSelect(100)
                 .setThriftConnectionFactoryClassName("org.apache.cassandra.thrift.TFramedTransportFactory"));
     }
 
@@ -48,20 +49,21 @@ public class TestCassandraClientConfig
     public void testExplicitPropertyMappings()
     {
         Map<String, String> properties = new ImmutableMap.Builder<String, String>()
-                .put("cassandra.limit-for-partition-key-select", "100")
-                .put("cassandra.fetch-size-for-partition-key-select", "500")
-                .put("cassandra.max-schema-refresh-threads", "2")
-                .put("cassandra.schema-cache-ttl", "2h")
-                .put("cassandra.schema-refresh-interval", "30m")
-                .put("cassandra.contact-points", "host1,host2")
-                .put("cassandra.native-protocol-port", "9999")
-                .put("cassandra.fetch-size", "10000")
-                .put("cassandra.consistency-level", "TWO")
-                .put("cassandra.split-size", "1025")
-                .put("cassandra.thrift-port", "9161")
+                .put("cassandra.limit_for_partition_key_select", "100")
+                .put("cassandra.fetch_size_for_partition_key_select", "500")
+                .put("cassandra.max_schema_refresh_threads", "2")
+                .put("cassandra.schema_cache_ttl", "2h")
+                .put("cassandra.schema_refresh_interval", "30m")
+                .put("cassandra.contact_points", "host1,host2")
+                .put("cassandra.native_protocol_port", "9999")
+                .put("cassandra.fetch_size", "10000")
+                .put("cassandra.consistency_level", "TWO")
+                .put("cassandra.split_size", "1025")
+                .put("cassandra.thrift_port", "9161")
                 .put("cassandra.partitioner", "RandomPartitioner")
-                .put("cassandra.transport-factory-options", "a=b")
-                .put("cassandra.thrift-connection-factory-class", "org.apache.cassandra.thrift.TFramedTransportFactory1")
+                .put("cassandra.transport_factory_options", "a=b")
+                .put("cassandra.partition_size_for_batch_select", "90")
+                .put("cassandra.thrift_connection_factory_class", "org.apache.cassandra.thrift.TFramedTransportFactory1")
                 .build();
 
         CassandraClientConfig expected = new CassandraClientConfig()
@@ -78,6 +80,7 @@ public class TestCassandraClientConfig
                 .setThriftPort(9161)
                 .setPartitioner("RandomPartitioner")
                 .setTransportFactoryOptions("a=b")
+                .setPartitionSizeForBatchSelect(90)
                 .setThriftConnectionFactoryClassName("org.apache.cassandra.thrift.TFramedTransportFactory1");
 
         ConfigAssertions.assertFullMapping(properties, expected);

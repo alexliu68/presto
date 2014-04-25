@@ -42,6 +42,7 @@ public class TestJsonCassandraHandles
             .put("cassandraType", "BIGINT")
             .put("partitionKey", false)
             .put("clusteringKey", true)
+            .put("indexed", false)
             .build();
 
     private static final Map<String, Object> COLUMN2_HANDLE_AS_MAP = ImmutableMap.<String, Object>builder()
@@ -52,6 +53,7 @@ public class TestJsonCassandraHandles
             .put("typeArguments", ImmutableList.of("INT"))
             .put("partitionKey", false)
             .put("clusteringKey", false)
+            .put("indexed", false)
             .build();
 
     private final ObjectMapper objectMapper = new ObjectMapperProvider().get();

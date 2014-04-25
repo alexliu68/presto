@@ -97,8 +97,8 @@ public class TestCassandraConnector
                 ImmutableMap.<String, String>of("node.environment", "test"));
 
         Connector connector = connectorFactory.create(connectorId, ImmutableMap.<String, String>of(
-                "cassandra.contact-points", "localhost",
-                "cassandra.native-protocol-port", "9142"));
+                "cassandra.contact_points", "localhost",
+                "cassandra.native_protocol_port", "9142"));
 
         metadata = connector.getMetadata();
         assertInstanceOf(metadata, CassandraMetadata.class);
