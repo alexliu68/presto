@@ -13,10 +13,10 @@
  */
 package com.facebook.presto.hive;
 
-import com.facebook.presto.spi.RecordCursor;
 import com.google.common.base.Optional;
 import org.apache.hadoop.io.Writable;
 import org.apache.hadoop.mapred.RecordReader;
+import org.joda.time.DateTimeZone;
 
 import java.util.List;
 
@@ -24,14 +24,16 @@ public class GenericHiveRecordCursorProvider
         implements HiveRecordCursorProvider
 {
     @Override
-    public Optional<RecordCursor> createHiveRecordCursor(HiveSplit split, RecordReader<?, ?> recordReader, List<HiveColumnHandle> columns)
+    public Optional<HiveRecordCursor> createHiveRecordCursor(HiveSplit split, RecordReader<?, ?> recordReader, List<HiveColumnHandle> columns, DateTimeZone hiveStorageTimeZone)
     {
-        return Optional.<RecordCursor>of(new GenericHiveRecordCursor<>(
+        return Optional.<HiveRecordCursor>of(new  GenericHiveRecordCursor<>(
                 genericRecordReader(recordReader),
                 split.getLength(),
                 split.getSchema(),
                 split.getPartitionKeys(),
-                columns));
+                columns,
+                hiveStorageTimeZone,
+                DateTimeZone.forID(split.getSession().getTimeZoneKey().getTimeZoneId())));
     }
 
     @SuppressWarnings("unchecked")

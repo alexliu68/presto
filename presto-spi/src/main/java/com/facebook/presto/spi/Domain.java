@@ -42,6 +42,9 @@ public final class Domain
     {
         this.ranges = Objects.requireNonNull(ranges, "ranges is null");
         this.nullAllowed = nullAllowed;
+        if (ranges.getType().isPrimitive()) {
+            throw new IllegalArgumentException("Primitive types not supported: " + ranges.getType());
+        }
     }
 
     public static Domain create(SortedRangeSet ranges, boolean nullAllowed)
@@ -155,6 +158,22 @@ public final class Domain
         SortedRangeSet unionRanges = this.getRanges().union(other.getRanges());
         boolean nullAllowed = this.isNullAllowed() || other.isNullAllowed();
         return new Domain(unionRanges, nullAllowed);
+    }
+
+    public static Domain union(List<Domain> domains)
+    {
+        if (domains.size() == 1) {
+            return domains.get(0);
+        }
+
+        boolean nullAllowed = false;
+        List<SortedRangeSet> ranges = new ArrayList<>();
+        for (Domain domain : domains) {
+            ranges.add(domain.getRanges());
+            nullAllowed = nullAllowed || domain.nullAllowed;
+        }
+
+        return new Domain(SortedRangeSet.union(ranges), nullAllowed);
     }
 
     public Domain complement()

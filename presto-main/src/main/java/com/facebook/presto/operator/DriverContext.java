@@ -14,7 +14,7 @@
 package com.facebook.presto.operator;
 
 import com.facebook.presto.execution.TaskId;
-import com.facebook.presto.sql.analyzer.Session;
+import com.facebook.presto.spi.Session;
 import com.google.common.base.Function;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Iterables;
@@ -39,6 +39,7 @@ import static com.google.common.collect.Iterables.getFirst;
 import static com.google.common.collect.Iterables.getLast;
 import static com.google.common.collect.Iterables.transform;
 import static io.airlift.units.DataSize.Unit.BYTE;
+import static java.util.concurrent.TimeUnit.MILLISECONDS;
 import static java.util.concurrent.TimeUnit.NANOSECONDS;
 
 @ThreadSafe
@@ -89,6 +90,11 @@ public class DriverContext
     public List<OperatorContext> getOperatorContexts()
     {
         return ImmutableList.copyOf(operatorContexts);
+    }
+
+    public PipelineContext getPipelineContext()
+    {
+        return pipelineContext;
     }
 
     public Session getSession()
@@ -224,6 +230,7 @@ public class DriverContext
         OperatorStats inputOperator = getFirst(operators, null);
         DataSize rawInputDataSize;
         long rawInputPositions;
+        Duration rawInputReadTime;
         DataSize processedInputDataSize;
         long processedInputPositions;
         DataSize outputDataSize;
@@ -231,6 +238,7 @@ public class DriverContext
         if (inputOperator != null) {
             rawInputDataSize = inputOperator.getInputDataSize();
             rawInputPositions = inputOperator.getInputPositions();
+            rawInputReadTime = inputOperator.getAddInputWall();
 
             processedInputDataSize = inputOperator.getOutputDataSize();
             processedInputPositions = inputOperator.getOutputPositions();
@@ -242,6 +250,7 @@ public class DriverContext
         else {
             rawInputDataSize = new DataSize(0, BYTE);
             rawInputPositions = 0;
+            rawInputReadTime = new Duration(0, MILLISECONDS);
 
             processedInputDataSize = new DataSize(0, BYTE);
             processedInputPositions = 0;
@@ -278,6 +287,7 @@ public class DriverContext
                 new Duration(totalBlockedTime, NANOSECONDS).convertToMostSuccinctTimeUnit(),
                 rawInputDataSize.convertToMostSuccinctDataSize(),
                 rawInputPositions,
+                rawInputReadTime,
                 processedInputDataSize.convertToMostSuccinctDataSize(),
                 processedInputPositions,
                 outputDataSize.convertToMostSuccinctDataSize(),

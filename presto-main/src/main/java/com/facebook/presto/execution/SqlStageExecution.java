@@ -19,12 +19,11 @@ import com.facebook.presto.PagePartitionFunction;
 import com.facebook.presto.UnpartitionedPagePartitionFunction;
 import com.facebook.presto.execution.NodeScheduler.NodeSelector;
 import com.facebook.presto.execution.StateMachine.StateChangeListener;
+import com.facebook.presto.metadata.Split;
 import com.facebook.presto.operator.TaskStats;
 import com.facebook.presto.spi.Node;
-import com.facebook.presto.spi.Split;
-import com.facebook.presto.spi.SplitSource;
+import com.facebook.presto.spi.Session;
 import com.facebook.presto.split.RemoteSplit;
-import com.facebook.presto.sql.analyzer.Session;
 import com.facebook.presto.sql.planner.PlanFragment;
 import com.facebook.presto.sql.planner.PlanFragment.OutputPartitioning;
 import com.facebook.presto.sql.planner.PlanFragment.PlanDistribution;
@@ -33,7 +32,6 @@ import com.facebook.presto.sql.planner.plan.ExchangeNode;
 import com.facebook.presto.sql.planner.plan.PlanFragmentId;
 import com.facebook.presto.sql.planner.plan.PlanNode;
 import com.facebook.presto.sql.planner.plan.PlanNodeId;
-import com.facebook.presto.tuple.TupleInfo;
 import com.facebook.presto.util.IterableTransformer;
 import com.facebook.presto.util.SetThreadName;
 import com.google.common.annotations.VisibleForTesting;
@@ -104,7 +102,6 @@ public class SqlStageExecution
     private final StageId stageId;
     private final URI location;
     private final PlanFragment fragment;
-    private final List<TupleInfo> tupleInfos;
     private final Map<PlanFragmentId, StageExecutionNode> subStages;
 
     private final ConcurrentMap<Node, RemoteTask> tasks = new ConcurrentHashMap<>();
@@ -204,8 +201,6 @@ public class SqlStageExecution
             this.splitBatchSize = splitBatchSize;
             this.initialHashPartitions = initialHashPartitions;
             this.executor = executor;
-
-            tupleInfos = fragment.getTupleInfos();
 
             ImmutableMap.Builder<PlanFragmentId, StageExecutionNode> subStages = ImmutableMap.builder();
             for (StageExecutionPlan subStagePlan : plan.getSubStages()) {
@@ -374,7 +369,7 @@ public class SqlStageExecution
                     state,
                     location,
                     fragment,
-                    tupleInfos,
+                    fragment.getTypes(),
                     stageStats,
                     taskInfos,
                     subStageInfos,
@@ -741,7 +736,7 @@ public class SqlStageExecution
                 node,
                 fragment,
                 initialSplits.build(),
-                currentOutputBuffers);
+                getCurrentOutputBuffers());
 
         task.addStateChangeListener(new StateChangeListener<TaskInfo>()
         {
@@ -804,7 +799,7 @@ public class SqlStageExecution
         // update tasks
         for (RemoteTask task : tasks.values()) {
             for (Entry<PlanNodeId, URI> entry : newExchangeLocations.entries()) {
-                RemoteSplit remoteSplit = createRemoteSplitFor(task.getNodeId(), entry.getValue());
+                Split remoteSplit = createRemoteSplitFor(task.getNodeId(), entry.getValue());
                 task.addSplits(entry.getKey(), ImmutableList.of(remoteSplit));
             }
             task.setOutputBuffers(outputBuffers);
@@ -953,10 +948,10 @@ public class SqlStageExecution
         }
     }
 
-    private RemoteSplit createRemoteSplitFor(String nodeId, URI taskLocation)
+    private Split createRemoteSplitFor(String nodeId, URI taskLocation)
     {
         URI splitLocation = uriBuilderFrom(taskLocation).appendPath("results").appendPath(nodeId).build();
-        return new RemoteSplit(splitLocation, tupleInfos);
+        return new Split("remote", new RemoteSplit(splitLocation));
     }
 
     @Override

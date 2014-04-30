@@ -14,18 +14,17 @@
 package com.facebook.presto.hive;
 
 import com.facebook.presto.hive.shaded.org.apache.thrift.TException;
-import com.facebook.presto.hive.util.HadoopApiStats;
-import com.facebook.presto.spi.ColumnHandle;
 import com.facebook.presto.spi.ColumnMetadata;
-import com.facebook.presto.spi.ColumnType;
+import com.facebook.presto.spi.ConnectorColumnHandle;
+import com.facebook.presto.spi.ConnectorPartitionResult;
+import com.facebook.presto.spi.ConnectorSplit;
+import com.facebook.presto.spi.ConnectorSplitSource;
+import com.facebook.presto.spi.ConnectorTableHandle;
 import com.facebook.presto.spi.ConnectorTableMetadata;
-import com.facebook.presto.spi.PartitionResult;
 import com.facebook.presto.spi.RecordCursor;
 import com.facebook.presto.spi.RecordSink;
 import com.facebook.presto.spi.SchemaTableName;
-import com.facebook.presto.spi.Split;
-import com.facebook.presto.spi.SplitSource;
-import com.facebook.presto.spi.TableHandle;
+import com.facebook.presto.spi.Session;
 import com.facebook.presto.spi.TupleDomain;
 import com.google.common.base.Throwables;
 import com.google.common.collect.ImmutableList;
@@ -40,11 +39,14 @@ import org.apache.hadoop.hive.metastore.api.Table;
 import org.testng.annotations.Test;
 
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ExecutorService;
 
 import static com.facebook.presto.hadoop.HadoopFileStatus.isDirectory;
+import static com.facebook.presto.spi.type.BigintType.BIGINT;
+import static com.facebook.presto.spi.type.TimeZoneKey.UTC_KEY;
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.collect.Iterables.getOnlyElement;
 import static com.google.common.util.concurrent.MoreExecutors.sameThreadExecutor;
@@ -57,6 +59,8 @@ import static org.testng.Assert.assertTrue;
 @Test(groups = "hive-s3")
 public abstract class AbstractTestHiveClientS3
 {
+    private static final Session SESSION = new Session("user", "test", "default", "default", UTC_KEY, Locale.ENGLISH, null, null);
+
     protected String database;
     protected SchemaTableName tableS3;
     protected SchemaTableName temporaryCreateTable;
@@ -96,8 +100,9 @@ public abstract class AbstractTestHiveClientS3
                 new HiveConnectorId("hive-test"),
                 hiveClientConfig,
                 metastoreClient,
-                new HadoopApiStats(),
+                new NamenodeStats(),
                 new HdfsEnvironment(new HdfsConfiguration(hiveClientConfig)),
+                new HadoopDirectoryLister(),
                 sameThreadExecutor());
     }
 
@@ -105,16 +110,16 @@ public abstract class AbstractTestHiveClientS3
     public void testGetRecordsS3()
             throws Exception
     {
-        TableHandle table = getTableHandle(tableS3);
-        List<ColumnHandle> columnHandles = ImmutableList.copyOf(client.getColumnHandles(table).values());
+        ConnectorTableHandle table = getTableHandle(tableS3);
+        List<ConnectorColumnHandle> columnHandles = ImmutableList.copyOf(client.getColumnHandles(table).values());
         Map<String, Integer> columnIndex = indexColumns(columnHandles);
 
-        PartitionResult partitionResult = client.getPartitions(table, TupleDomain.all());
+        ConnectorPartitionResult partitionResult = client.getPartitions(table, TupleDomain.<ConnectorColumnHandle>all());
         assertEquals(partitionResult.getPartitions().size(), 1);
-        SplitSource splitSource = client.getPartitionSplits(table, partitionResult.getPartitions());
+        ConnectorSplitSource splitSource = client.getPartitionSplits(table, partitionResult.getPartitions());
 
         long sum = 0;
-        for (Split split : getAllSplits(splitSource)) {
+        for (ConnectorSplit split : getAllSplits(splitSource)) {
             try (RecordCursor cursor = client.getRecordSet(split, columnHandles).cursor()) {
                 while (cursor.advanceNextPosition()) {
                     sum += cursor.getLong(columnIndex.get("t_bigint"));
@@ -156,11 +161,11 @@ public abstract class AbstractTestHiveClientS3
     {
         // begin creating the table
         List<ColumnMetadata> columns = ImmutableList.<ColumnMetadata>builder()
-                .add(new ColumnMetadata("id", ColumnType.LONG, 1, false))
+                .add(new ColumnMetadata("id", BIGINT, 1, false))
                 .build();
 
         ConnectorTableMetadata tableMetadata = new ConnectorTableMetadata(tableName, columns, tableOwner);
-        HiveOutputTableHandle outputHandle = client.beginCreateTable(tableMetadata);
+        HiveOutputTableHandle outputHandle = client.beginCreateTable(SESSION, tableMetadata);
 
         // write the records
         RecordSink sink = client.getRecordSink(outputHandle);
@@ -190,15 +195,14 @@ public abstract class AbstractTestHiveClientS3
         metastoreClient.updateTableLocation(database, tableName.getTableName(), outputHandle.getTargetPath());
 
         // load the new table
-        TableHandle tableHandle = getTableHandle(tableName);
-        List<ColumnHandle> columnHandles = ImmutableList.copyOf(client.getColumnHandles(tableHandle).values());
+        ConnectorTableHandle tableHandle = getTableHandle(tableName);
+        List<ConnectorColumnHandle> columnHandles = ImmutableList.copyOf(client.getColumnHandles(tableHandle).values());
 
         // verify the data
-        PartitionResult partitionResult = client.getPartitions(tableHandle, TupleDomain.all());
+        ConnectorPartitionResult partitionResult = client.getPartitions(tableHandle, TupleDomain.<ConnectorColumnHandle>all());
         assertEquals(partitionResult.getPartitions().size(), 1);
-        SplitSource splitSource = client.getPartitionSplits(tableHandle, partitionResult.getPartitions());
-        Split split = getOnlyElement(splitSource.getNextBatch(1000));
-        assertTrue(splitSource.isFinished());
+        ConnectorSplitSource splitSource = client.getPartitionSplits(tableHandle, partitionResult.getPartitions());
+        ConnectorSplit split = getOnlyElement(getAllSplits(splitSource));
 
         try (RecordCursor cursor = client.getRecordSet(split, columnHandles).cursor()) {
             assertTrue(cursor.advanceNextPosition());
@@ -224,28 +228,28 @@ public abstract class AbstractTestHiveClientS3
         }
     }
 
-    private TableHandle getTableHandle(SchemaTableName tableName)
+    private ConnectorTableHandle getTableHandle(SchemaTableName tableName)
     {
-        TableHandle handle = client.getTableHandle(tableName);
+        ConnectorTableHandle handle = client.getTableHandle(SESSION, tableName);
         checkArgument(handle != null, "table not found: %s", tableName);
         return handle;
     }
 
-    private static List<Split> getAllSplits(SplitSource source)
+    private static List<ConnectorSplit> getAllSplits(ConnectorSplitSource source)
             throws InterruptedException
     {
-        ImmutableList.Builder<Split> splits = ImmutableList.builder();
+        ImmutableList.Builder<ConnectorSplit> splits = ImmutableList.builder();
         while (!source.isFinished()) {
             splits.addAll(source.getNextBatch(1000));
         }
         return splits.build();
     }
 
-    private static ImmutableMap<String, Integer> indexColumns(List<ColumnHandle> columnHandles)
+    private static ImmutableMap<String, Integer> indexColumns(List<ConnectorColumnHandle> columnHandles)
     {
         ImmutableMap.Builder<String, Integer> index = ImmutableMap.builder();
         int i = 0;
-        for (ColumnHandle columnHandle : columnHandles) {
+        for (ConnectorColumnHandle columnHandle : columnHandles) {
             checkArgument(columnHandle instanceof HiveColumnHandle, "columnHandle is not an instance of HiveColumnHandle");
             HiveColumnHandle hiveColumnHandle = (HiveColumnHandle) columnHandle;
             index.put(hiveColumnHandle.getName(), i);

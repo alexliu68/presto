@@ -20,9 +20,9 @@ import com.facebook.presto.metadata.Metadata;
 import com.facebook.presto.split.SplitManager;
 import com.facebook.presto.sql.analyzer.Analysis;
 import com.facebook.presto.sql.analyzer.Analyzer;
-import com.facebook.presto.sql.analyzer.AnalyzerConfig;
+import com.facebook.presto.sql.analyzer.FeaturesConfig;
 import com.facebook.presto.sql.analyzer.QueryExplainer;
-import com.facebook.presto.sql.analyzer.Session;
+import com.facebook.presto.spi.Session;
 import com.facebook.presto.sql.planner.DistributedExecutionPlanner;
 import com.facebook.presto.sql.planner.DistributedLogicalPlanner;
 import com.facebook.presto.sql.planner.InputExtractor;
@@ -67,6 +67,7 @@ public class SqlQueryExecution
 
     private final QueryStateMachine stateMachine;
 
+    private final Session session;
     private final Statement statement;
     private final Metadata metadata;
     private final SplitManager splitManager;
@@ -101,6 +102,7 @@ public class SqlQueryExecution
             ExecutorService queryExecutor)
     {
         try (SetThreadName setThreadName = new SetThreadName("Query-%s", queryId)) {
+            this.session = checkNotNull(session, "session is null");
             this.statement = checkNotNull(statement, "statement is null");
             this.metadata = checkNotNull(metadata, "metadata is null");
             this.splitManager = checkNotNull(splitManager, "splitManager is null");
@@ -206,7 +208,7 @@ public class SqlQueryExecution
         stateMachine.setInputs(inputs);
 
         // fragment the plan
-        SubPlan subplan = new DistributedLogicalPlanner(metadata, idAllocator).createSubPlans(plan, false);
+        SubPlan subplan = new DistributedLogicalPlanner(session, metadata, idAllocator).createSubPlans(plan, false);
 
         stateMachine.recordAnalysisTime(analysisStart);
         return subplan;
@@ -397,7 +399,7 @@ public class SqlQueryExecution
 
         @Inject
         SqlQueryExecutionFactory(QueryManagerConfig config,
-                AnalyzerConfig analyzerConfig,
+                FeaturesConfig featuresConfig,
                 Metadata metadata,
                 LocationFactory locationFactory,
                 SplitManager splitManager,
@@ -415,7 +417,7 @@ public class SqlQueryExecution
             this.nodeScheduler = checkNotNull(nodeScheduler, "nodeScheduler is null");
             this.planOptimizers = checkNotNull(planOptimizers, "planOptimizers is null");
             this.remoteTaskFactory = checkNotNull(remoteTaskFactory, "remoteTaskFactory is null");
-            this.experimentalSyntaxEnabled = checkNotNull(analyzerConfig, "analyzerConfig is null").isExperimentalSyntaxEnabled();
+            this.experimentalSyntaxEnabled = checkNotNull(featuresConfig, "featuresConfig is null").isExperimentalSyntaxEnabled();
 
             this.executor = Executors.newCachedThreadPool(threadsNamed("query-scheduler-%d"));
             this.executorMBean = new ThreadPoolExecutorMBean((ThreadPoolExecutor) executor);

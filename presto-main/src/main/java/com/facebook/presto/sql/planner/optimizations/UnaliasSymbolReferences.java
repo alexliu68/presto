@@ -13,20 +13,23 @@
  */
 package com.facebook.presto.sql.planner.optimizations;
 
+import com.facebook.presto.metadata.ColumnHandle;
 import com.facebook.presto.metadata.Signature;
-import com.facebook.presto.operator.SortOrder;
-import com.facebook.presto.spi.ColumnHandle;
-import com.facebook.presto.sql.analyzer.Session;
-import com.facebook.presto.sql.analyzer.Type;
+import com.facebook.presto.spi.Session;
+import com.facebook.presto.spi.block.SortOrder;
+import com.facebook.presto.spi.type.Type;
+import com.facebook.presto.sql.planner.DeterminismEvaluator;
 import com.facebook.presto.sql.planner.PlanNodeIdAllocator;
 import com.facebook.presto.sql.planner.Symbol;
 import com.facebook.presto.sql.planner.SymbolAllocator;
 import com.facebook.presto.sql.planner.plan.AggregationNode;
-import com.facebook.presto.sql.planner.plan.MaterializeSampleNode;
 import com.facebook.presto.sql.planner.plan.FilterNode;
+import com.facebook.presto.sql.planner.plan.IndexJoinNode;
+import com.facebook.presto.sql.planner.plan.IndexSourceNode;
 import com.facebook.presto.sql.planner.plan.JoinNode;
 import com.facebook.presto.sql.planner.plan.LimitNode;
 import com.facebook.presto.sql.planner.plan.MarkDistinctNode;
+import com.facebook.presto.sql.planner.plan.MaterializeSampleNode;
 import com.facebook.presto.sql.planner.plan.OutputNode;
 import com.facebook.presto.sql.planner.plan.PlanNode;
 import com.facebook.presto.sql.planner.plan.PlanNodeRewriter;
@@ -43,10 +46,12 @@ import com.facebook.presto.sql.tree.Expression;
 import com.facebook.presto.sql.tree.ExpressionRewriter;
 import com.facebook.presto.sql.tree.ExpressionTreeRewriter;
 import com.facebook.presto.sql.tree.FunctionCall;
+import com.facebook.presto.sql.tree.NullLiteral;
 import com.facebook.presto.sql.tree.QualifiedNameReference;
 import com.google.common.base.Function;
 import com.google.common.base.Optional;
 import com.google.common.base.Preconditions;
+import com.google.common.collect.FluentIterable;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableListMultimap;
 import com.google.common.collect.ImmutableMap;
@@ -60,6 +65,7 @@ import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import static com.google.common.base.Preconditions.checkNotNull;
 
@@ -178,7 +184,7 @@ public class UnaliasSymbolReferences
             if (node.getOriginalConstraint() != null) {
                 originalConstraint = canonicalize(node.getOriginalConstraint());
             }
-            return new TableScanNode(node.getId(), node.getTable(), canonicalize(node.getOutputSymbols()), builder.build(), originalConstraint, node.getGeneratedPartitions());
+            return new TableScanNode(node.getId(), node.getTable(), canonicalize(node.getOutputSymbols()), builder.build(), originalConstraint, node.getSummarizedPartition());
         }
 
         @Override
@@ -194,14 +200,31 @@ public class UnaliasSymbolReferences
         {
             PlanNode source = planRewriter.rewrite(node.getSource(), context);
 
+            Map<Expression, Symbol> computedExpressions = new HashMap<>();
+
             Map<Symbol, Expression> assignments = new LinkedHashMap<>();
             for (Map.Entry<Symbol, Expression> entry : node.getOutputMap().entrySet()) {
                 Expression expression = canonicalize(entry.getValue());
 
                 if (entry.getValue() instanceof QualifiedNameReference) {
+                    // Always map a trivial symbol projection
                     Symbol symbol = Symbol.fromQualifiedName(((QualifiedNameReference) entry.getValue()).getName());
                     if (!symbol.equals(entry.getKey())) {
                         map(entry.getKey(), symbol);
+                    }
+                }
+                else if (DeterminismEvaluator.isDeterministic(expression) && !(expression instanceof NullLiteral)) {
+                    // Try to map same deterministic expressions within a projection into the same symbol
+                    // Omit NullLiterals since those have ambiguous types
+                    Symbol computedSymbol = computedExpressions.get(expression);
+                    if (computedSymbol == null) {
+                        // If we haven't seen the expression before in this projection, record it
+                        computedExpressions.put(expression, entry.getKey());
+                    }
+                    else {
+                        // If we have seen the expression before and if it is deterministic
+                        // then we can rewrite references to the current symbol in terms of the parallel computedSymbol in the projection
+                        map(entry.getKey(), computedSymbol);
                     }
                 }
 
@@ -275,6 +298,25 @@ public class UnaliasSymbolReferences
         }
 
         @Override
+        public PlanNode rewriteIndexSource(IndexSourceNode node, Void context, PlanRewriter<Void> planRewriter)
+        {
+            ImmutableMap.Builder<Symbol, ColumnHandle> builder = ImmutableMap.builder();
+            for (Map.Entry<Symbol, ColumnHandle> entry : node.getAssignments().entrySet()) {
+                builder.put(canonicalize(entry.getKey()), entry.getValue());
+            }
+            return new IndexSourceNode(node.getId(), node.getIndexHandle(), node.getTableHandle(), canonicalize(node.getLookupSymbols()), canonicalize(node.getOutputSymbols()), builder.build(), node.getEffectiveTupleDomain());
+        }
+
+        @Override
+        public PlanNode rewriteIndexJoin(IndexJoinNode node, Void context, PlanRewriter<Void> planRewriter)
+        {
+            PlanNode probeSource = planRewriter.rewrite(node.getProbeSource(), context);
+            PlanNode indexSource = planRewriter.rewrite(node.getIndexSource(), context);
+
+            return new IndexJoinNode(node.getId(), node.getType(), probeSource, indexSource, canonicalizeIndexJoinCriteria(node.getCriteria()));
+        }
+
+        @Override
         public PlanNode rewriteUnion(UnionNode node, Void context, PlanRewriter<Void> planRewriter)
         {
             ImmutableList.Builder<PlanNode> rewrittenSources = ImmutableList.builder();
@@ -334,11 +376,28 @@ public class UnaliasSymbolReferences
             return Lists.transform(outputs, canonicalizeFunction());
         }
 
+        private Set<Symbol> canonicalize(Set<Symbol> symbols)
+        {
+            return FluentIterable.from(symbols)
+                    .transform(canonicalizeFunction())
+                    .toSet();
+        }
+
         private List<JoinNode.EquiJoinClause> canonicalizeJoinCriteria(List<JoinNode.EquiJoinClause> criteria)
         {
             ImmutableList.Builder<JoinNode.EquiJoinClause> builder = ImmutableList.builder();
             for (JoinNode.EquiJoinClause clause : criteria) {
                 builder.add(new JoinNode.EquiJoinClause(canonicalize(clause.getLeft()), canonicalize(clause.getRight())));
+            }
+
+            return builder.build();
+        }
+
+        private List<IndexJoinNode.EquiJoinClause> canonicalizeIndexJoinCriteria(List<IndexJoinNode.EquiJoinClause> criteria)
+        {
+            ImmutableList.Builder<IndexJoinNode.EquiJoinClause> builder = ImmutableList.builder();
+            for (IndexJoinNode.EquiJoinClause clause : criteria) {
+                builder.add(new IndexJoinNode.EquiJoinClause(canonicalize(clause.getProbe()), canonicalize(clause.getIndex())));
             }
 
             return builder.build();

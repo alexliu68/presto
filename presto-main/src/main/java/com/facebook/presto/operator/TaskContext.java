@@ -17,7 +17,7 @@ import com.facebook.presto.execution.StateMachine.StateChangeListener;
 import com.facebook.presto.execution.TaskId;
 import com.facebook.presto.execution.TaskState;
 import com.facebook.presto.execution.TaskStateMachine;
-import com.facebook.presto.sql.analyzer.Session;
+import com.facebook.presto.spi.Session;
 import com.google.common.base.Function;
 import com.google.common.collect.ImmutableList;
 import io.airlift.stats.CounterStat;
@@ -173,6 +173,12 @@ public class TaskContext
         }
         memoryReservation.getAndAdd(bytes);
         return true;
+    }
+
+    public synchronized void freeMemory(long bytes)
+    {
+        checkArgument(bytes <= memoryReservation.get(), "tried to free more memory than is reserved");
+        memoryReservation.getAndAdd(-bytes);
     }
 
     public boolean isCpuTimerEnabled()

@@ -19,37 +19,31 @@ public abstract class ReadOnlyConnectorMetadata
         implements ConnectorMetadata
 {
     @Override
-    public final TableHandle createTable(ConnectorTableMetadata tableMetadata)
+    public final ConnectorTableHandle createTable(Session session, ConnectorTableMetadata tableMetadata)
     {
         throw new UnsupportedOperationException();
     }
 
     @Override
-    public final void dropTable(TableHandle tableHandle)
+    public final void dropTable(ConnectorTableHandle tableHandle)
     {
         throw new UnsupportedOperationException();
     }
 
     @Override
-    public boolean canHandle(OutputTableHandle tableHandle)
+    public final boolean canCreateSampledTables(Session session)
     {
         return false;
     }
 
     @Override
-    public final boolean canCreateSampledTables()
-    {
-        return false;
-    }
-
-    @Override
-    public final OutputTableHandle beginCreateTable(ConnectorTableMetadata tableMetadata)
+    public final ConnectorOutputTableHandle beginCreateTable(Session session, ConnectorTableMetadata tableMetadata)
     {
         throw new UnsupportedOperationException();
     }
 
     @Override
-    public final void commitCreateTable(OutputTableHandle tableHandle, Collection<String> fragments)
+    public final void commitCreateTable(ConnectorOutputTableHandle tableHandle, Collection<String> fragments)
     {
         throw new UnsupportedOperationException();
     }

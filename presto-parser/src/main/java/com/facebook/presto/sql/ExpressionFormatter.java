@@ -22,13 +22,13 @@ import com.facebook.presto.sql.tree.Cast;
 import com.facebook.presto.sql.tree.CoalesceExpression;
 import com.facebook.presto.sql.tree.ComparisonExpression;
 import com.facebook.presto.sql.tree.CurrentTime;
-import com.facebook.presto.sql.tree.DateLiteral;
 import com.facebook.presto.sql.tree.DoubleLiteral;
 import com.facebook.presto.sql.tree.ExistsPredicate;
 import com.facebook.presto.sql.tree.Expression;
 import com.facebook.presto.sql.tree.Extract;
 import com.facebook.presto.sql.tree.FrameBound;
 import com.facebook.presto.sql.tree.FunctionCall;
+import com.facebook.presto.sql.tree.GenericLiteral;
 import com.facebook.presto.sql.tree.IfExpression;
 import com.facebook.presto.sql.tree.InListExpression;
 import com.facebook.presto.sql.tree.InPredicate;
@@ -44,6 +44,7 @@ import com.facebook.presto.sql.tree.Node;
 import com.facebook.presto.sql.tree.NotExpression;
 import com.facebook.presto.sql.tree.NullIfExpression;
 import com.facebook.presto.sql.tree.NullLiteral;
+import com.facebook.presto.sql.tree.QualifiedName;
 import com.facebook.presto.sql.tree.QualifiedNameReference;
 import com.facebook.presto.sql.tree.SearchedCaseExpression;
 import com.facebook.presto.sql.tree.SimpleCaseExpression;
@@ -159,6 +160,12 @@ public final class ExpressionFormatter
         }
 
         @Override
+        protected String visitGenericLiteral(GenericLiteral node, Void context)
+        {
+            return "" + node.getType() + " '" + node.getValue() + "'";
+        }
+
+        @Override
         protected String visitTimeLiteral(TimeLiteral node, Void context)
         {
             return "TIME '" + node.getValue() + "'";
@@ -177,16 +184,19 @@ public final class ExpressionFormatter
         }
 
         @Override
-        protected String visitDateLiteral(DateLiteral node, Void context)
-        {
-            return "DATE '" + node.getValue() + "'";
-        }
-
-        @Override
         protected String visitIntervalLiteral(IntervalLiteral node, Void context)
         {
             String sign = (node.getSign() == IntervalLiteral.Sign.NEGATIVE) ? "- " : "";
-            return "INTERVAL " + sign + "'" + node.getValue() + "' " + node.getType();
+            StringBuilder builder = new StringBuilder()
+                    .append("INTERVAL ")
+                    .append(sign)
+                    .append(" '").append(node.getValue()).append("' ")
+                    .append(node.getStartField());
+
+            if (node.getEndField() != null)  {
+                builder.append(" TO ").append(node.getEndField());
+            }
+            return builder.toString();
         }
 
         @Override
@@ -204,8 +214,13 @@ public final class ExpressionFormatter
         @Override
         protected String visitQualifiedNameReference(QualifiedNameReference node, Void context)
         {
+            return formatQualifiedName(node.getName());
+        }
+
+        private static String formatQualifiedName(QualifiedName name)
+        {
             List<String> parts = new ArrayList<>();
-            for (String part : node.getName().getParts()) {
+            for (String part : name.getParts()) {
                 parts.add(formatIdentifier(part));
             }
             return Joiner.on('.').join(parts);
@@ -231,7 +246,7 @@ public final class ExpressionFormatter
                 arguments = "DISTINCT " + arguments;
             }
 
-            builder.append(node.getName())
+            builder.append(formatQualifiedName(node.getName()))
                     .append('(').append(arguments).append(')');
 
             if (node.getWindow().isPresent()) {

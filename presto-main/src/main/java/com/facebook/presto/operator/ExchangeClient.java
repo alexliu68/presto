@@ -14,6 +14,9 @@
 package com.facebook.presto.operator;
 
 import com.facebook.presto.operator.HttpPageBufferClient.ClientCallback;
+import com.facebook.presto.spi.block.BlockEncodingSerde;
+import com.google.common.base.Stopwatch;
+import com.google.common.base.Throwables;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Sets;
 import com.google.common.util.concurrent.Futures;
@@ -41,6 +44,7 @@ import java.util.concurrent.Executor;
 import java.util.concurrent.LinkedBlockingDeque;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
 
 import static com.facebook.presto.util.Threads.checkNotSameThreadExecutor;
 import static com.google.common.base.Preconditions.checkNotNull;
@@ -52,9 +56,11 @@ public class ExchangeClient
 {
     private static final Page NO_MORE_PAGES = new Page(0);
 
+    private final BlockEncodingSerde blockEncodingSerde;
     private final long maxBufferedBytes;
     private final DataSize maxResponseSize;
     private final int concurrentRequestMultiplier;
+    private final Duration minErrorDuration;
     private final AsyncHttpClient httpClient;
     private final Executor executor;
 
@@ -83,16 +89,22 @@ public class ExchangeClient
     private long averageBytesPerRequest;
 
     private final AtomicBoolean closed = new AtomicBoolean();
+    private final AtomicReference<Throwable> failure = new AtomicReference<>();
 
-    public ExchangeClient(DataSize maxBufferedBytes,
+    public ExchangeClient(
+            BlockEncodingSerde blockEncodingSerde,
+            DataSize maxBufferedBytes,
             DataSize maxResponseSize,
             int concurrentRequestMultiplier,
+            Duration minErrorDuration,
             AsyncHttpClient httpClient,
             Executor executor)
     {
+        this.blockEncodingSerde = blockEncodingSerde;
         this.maxBufferedBytes = maxBufferedBytes.toBytes();
         this.maxResponseSize = maxResponseSize;
         this.concurrentRequestMultiplier = concurrentRequestMultiplier;
+        this.minErrorDuration = minErrorDuration;
         this.httpClient = httpClient;
         this.executor = checkNotSameThreadExecutor(executor, "executor");
     }
@@ -133,6 +145,8 @@ public class ExchangeClient
     {
         checkState(!Thread.holdsLock(this), "Can not get next page while holding a lock on this");
 
+        throwIfFailed();
+
         if (closed.get()) {
             return null;
         }
@@ -147,6 +161,8 @@ public class ExchangeClient
             throws InterruptedException
     {
         checkState(!Thread.holdsLock(this), "Can not get next page while holding a lock on this");
+
+        throwIfFailed();
 
         if (closed.get()) {
             return null;
@@ -214,7 +230,7 @@ public class ExchangeClient
 
     public synchronized void scheduleRequestIfNecessary()
     {
-        if (closed.get()) {
+        if (isClosed() || isFailed()) {
             return;
         }
 
@@ -233,7 +249,15 @@ public class ExchangeClient
         // add clients for new locations
         for (URI location : locations) {
             if (!allClients.containsKey(location)) {
-                HttpPageBufferClient client = new HttpPageBufferClient(httpClient, maxResponseSize, location, new ExchangeClientCallback(), executor);
+                HttpPageBufferClient client = new HttpPageBufferClient(
+                        httpClient,
+                        maxResponseSize,
+                        minErrorDuration,
+                        location,
+                        new ExchangeClientCallback(),
+                        blockEncodingSerde,
+                        executor,
+                        Stopwatch.createUnstarted());
                 allClients.put(location, client);
                 queuedClients.add(client);
             }
@@ -266,7 +290,7 @@ public class ExchangeClient
 
     public synchronized ListenableFuture<?> isBlocked()
     {
-        if (closed.get() || pageBuffer.peek() != null) {
+        if (isClosed() || isFailed() || pageBuffer.peek() != null) {
             return Futures.immediateFuture(true);
         }
         SettableFuture<?> future = SettableFuture.create();
@@ -276,7 +300,7 @@ public class ExchangeClient
 
     private synchronized void addPage(Page page)
     {
-        if (closed.get()) {
+        if (isClosed() || isFailed()) {
             return;
         }
 
@@ -318,6 +342,29 @@ public class ExchangeClient
         scheduleRequestIfNecessary();
     }
 
+    private synchronized void clientFailed(Throwable cause)
+    {
+        // TODO: properly handle the failed vs closed state
+        // it is important not to treat failures as a successful close
+        if (!isClosed()) {
+            failure.compareAndSet(null, cause);
+            notifyBlockedCallers();
+        }
+    }
+
+    private boolean isFailed()
+    {
+        return failure.get() != null;
+    }
+
+    private void throwIfFailed()
+    {
+        Throwable t = failure.get();
+        if (t != null) {
+            throw Throwables.propagate(t);
+        }
+    }
+
     private class ExchangeClientCallback
             implements ClientCallback
     {
@@ -341,6 +388,14 @@ public class ExchangeClient
         public void clientFinished(HttpPageBufferClient client)
         {
             ExchangeClient.this.clientFinished(client);
+        }
+
+        @Override
+        public void clientFailed(HttpPageBufferClient client, Throwable cause)
+        {
+            checkNotNull(client, "client is null");
+            checkNotNull(cause, "cause is null");
+            ExchangeClient.this.clientFailed(cause);
         }
     }
 

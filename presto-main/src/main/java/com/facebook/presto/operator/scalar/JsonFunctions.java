@@ -20,7 +20,6 @@ import com.facebook.presto.operator.scalar.JsonExtract.JsonExtractor;
 import com.facebook.presto.sql.gen.DefaultFunctionBinder;
 import com.facebook.presto.sql.gen.FunctionBinder;
 import com.facebook.presto.sql.gen.FunctionBinding;
-import com.facebook.presto.sql.gen.TypedByteCodeNode;
 import com.facebook.presto.util.ThreadLocalCache;
 import com.fasterxml.jackson.core.JsonFactory;
 import com.fasterxml.jackson.core.JsonParser;
@@ -30,7 +29,6 @@ import com.google.common.base.Throwables;
 import com.google.common.collect.ImmutableList;
 import com.google.common.primitives.Doubles;
 import io.airlift.slice.Slice;
-import io.airlift.slice.Slices;
 
 import javax.annotation.Nullable;
 
@@ -51,6 +49,7 @@ import static com.fasterxml.jackson.core.JsonToken.VALUE_NUMBER_FLOAT;
 import static com.fasterxml.jackson.core.JsonToken.VALUE_NUMBER_INT;
 import static com.fasterxml.jackson.core.JsonToken.VALUE_STRING;
 import static com.fasterxml.jackson.core.JsonToken.VALUE_TRUE;
+import static io.airlift.slice.Slices.utf8Slice;
 import static java.lang.invoke.MethodHandles.lookup;
 import static java.lang.invoke.MethodType.methodType;
 
@@ -241,7 +240,7 @@ public final class JsonFunctions
                 }
                 if (token == END_ARRAY) {
                     if (tokens != null && count >= index * -1) {
-                        return Slices.utf8Slice(tokens.get(0));
+                        return utf8Slice(tokens.get(0));
                     }
 
                     return null;
@@ -252,7 +251,7 @@ public final class JsonFunctions
                     if (parser.getValueAsString() == null) {
                         return null;
                     }
-                    return Slices.utf8Slice(parser.getValueAsString());
+                    return utf8Slice(parser.getValueAsString());
                 }
 
                 if (tokens != null) {
@@ -310,13 +309,13 @@ public final class JsonFunctions
         }
 
         @Override
-        public FunctionBinding bindFunction(long bindingId, String name, ByteCodeNode getSessionByteCode, List<TypedByteCodeNode> arguments)
+        public FunctionBinding bindFunction(long bindingId, String name, ByteCodeNode getSessionByteCode, List<ByteCodeNode> arguments)
         {
-            TypedByteCodeNode patternNode = arguments.get(1);
+            ByteCodeNode patternNode = arguments.get(1);
 
             MethodHandle methodHandle;
-            if (patternNode.getNode() instanceof Constant) {
-                Slice patternSlice = (Slice) ((Constant) patternNode.getNode()).getValue();
+            if (patternNode instanceof Constant) {
+                Slice patternSlice = (Slice) ((Constant) patternNode).getValue();
                 String pattern = patternSlice.toString(Charsets.UTF_8);
 
                 JsonExtractor jsonExtractor;

@@ -16,9 +16,9 @@ package com.facebook.presto.server;
 import com.facebook.presto.OutputBuffers;
 import com.facebook.presto.ScheduledSplit;
 import com.facebook.presto.TaskSource;
-import com.facebook.presto.client.FailureInfo;
 import com.facebook.presto.client.PrestoHeaders;
 import com.facebook.presto.execution.BufferInfo;
+import com.facebook.presto.execution.ExecutionFailureInfo;
 import com.facebook.presto.execution.RemoteTask;
 import com.facebook.presto.execution.SharedBuffer.QueueState;
 import com.facebook.presto.execution.SharedBufferInfo;
@@ -27,14 +27,14 @@ import com.facebook.presto.execution.StateMachine.StateChangeListener;
 import com.facebook.presto.execution.TaskId;
 import com.facebook.presto.execution.TaskInfo;
 import com.facebook.presto.execution.TaskState;
+import com.facebook.presto.metadata.Split;
 import com.facebook.presto.operator.TaskContext;
 import com.facebook.presto.operator.TaskStats;
 import com.facebook.presto.spi.PrestoException;
-import com.facebook.presto.spi.Split;
-import com.facebook.presto.sql.analyzer.Session;
+import com.facebook.presto.spi.Session;
+import com.facebook.presto.spi.type.Type;
 import com.facebook.presto.sql.planner.PlanFragment;
 import com.facebook.presto.sql.planner.plan.PlanNodeId;
-import com.facebook.presto.tuple.TupleInfo;
 import com.facebook.presto.util.SetThreadName;
 import com.google.common.base.Function;
 import com.google.common.base.Objects;
@@ -131,7 +131,7 @@ public class HttpRemoteTask
     private final Executor executor;
     private final JsonCodec<TaskInfo> taskInfoCodec;
     private final JsonCodec<TaskUpdateRequest> taskUpdateRequestCodec;
-    private final List<TupleInfo> tupleInfos;
+    private final List<Type> types;
 
     private final RateLimiter errorRequestRateLimiter = RateLimiter.create(0.1);
 
@@ -176,7 +176,7 @@ public class HttpRemoteTask
             this.executor = executor;
             this.taskInfoCodec = taskInfoCodec;
             this.taskUpdateRequestCodec = taskUpdateRequestCodec;
-            this.tupleInfos = planFragment.getTupleInfos();
+            this.types = planFragment.getTypes();
             this.maxConsecutiveErrorCount = maxConsecutiveErrorCount;
             this.minErrorDuration = minErrorDuration;
 
@@ -205,7 +205,7 @@ public class HttpRemoteTask
                     new SharedBufferInfo(QueueState.OPEN, 0, 0, bufferStates),
                     ImmutableSet.<PlanNodeId>of(),
                     taskStats,
-                    ImmutableList.<FailureInfo>of()));
+                    ImmutableList.<ExecutionFailureInfo>of()));
         }
     }
 
@@ -231,7 +231,7 @@ public class HttpRemoteTask
     }
 
     @Override
-    public synchronized void addSplits(PlanNodeId sourceId, Iterable<? extends Split> splits)
+    public synchronized void addSplits(PlanNodeId sourceId, Iterable<Split> splits)
     {
         try (SetThreadName setThreadName = new SetThreadName("HttpRemoteTask-%s", taskId)) {
             checkNotNull(sourceId, "sourceId is null");
@@ -418,7 +418,7 @@ public class HttpRemoteTask
                     taskInfo.getOutputBuffers(),
                     taskInfo.getNoMoreSplits(),
                     taskInfo.getStats(),
-                    ImmutableList.<FailureInfo>of()));
+                    ImmutableList.<ExecutionFailureInfo>of()));
 
             // fire delete to task and ignore response
             if (taskInfo.getSelf() != null) {
@@ -508,7 +508,7 @@ public class HttpRemoteTask
         Duration timeSinceLastSuccess = Duration.nanosSince(lastSuccessfulRequest.get());
         if (errorCount > maxConsecutiveErrorCount && timeSinceLastSuccess.compareTo(minErrorDuration) > 0) {
             // it is weird to mark the task failed locally and then cancel the remote task, but there is no way to tell a remote task that it is failed
-            PrestoException exception = new PrestoException(TOO_MANY_REQUESTS_FAILED, format("Too many requests to %s failed: %s failures: Time since last success %s",
+            PrestoException exception = new PrestoException(TOO_MANY_REQUESTS_FAILED.toErrorCode(), format("Too many requests to %s failed: %s failures: Time since last success %s",
                     taskInfo.getSelf(),
                     errorCount,
                     timeSinceLastSuccess));

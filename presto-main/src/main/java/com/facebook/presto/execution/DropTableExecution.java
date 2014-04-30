@@ -18,10 +18,11 @@ import com.facebook.presto.metadata.MetadataManager;
 import com.facebook.presto.metadata.NativeTableHandle;
 import com.facebook.presto.metadata.QualifiedTableName;
 import com.facebook.presto.metadata.ShardManager;
+import com.facebook.presto.metadata.TableHandle;
 import com.facebook.presto.metadata.TablePartition;
+import com.facebook.presto.spi.Session;
+import com.facebook.presto.spi.ConnectorTableHandle;
 import com.facebook.presto.spi.PrestoException;
-import com.facebook.presto.spi.TableHandle;
-import com.facebook.presto.sql.analyzer.Session;
 import com.facebook.presto.sql.tree.DropTable;
 import com.facebook.presto.sql.tree.Statement;
 import com.google.common.base.Optional;
@@ -51,6 +52,7 @@ public class DropTableExecution
 {
     private static final Logger log = Logger.get(DropTableExecution.class);
 
+    private final Session session;
     private final DropTable statement;
     private final MetadataManager metadataManager;
     private final ShardManager shardManager;
@@ -65,6 +67,7 @@ public class DropTableExecution
             ShardManager shardManager,
             Executor executor)
     {
+        this.session = checkNotNull(session, "session is null");
         this.statement = statement;
         this.metadataManager = metadataManager;
         this.shardManager = shardManager;
@@ -141,15 +144,16 @@ public class DropTableExecution
 
         log.debug("Dropping %s", tableName);
 
-        final Optional<TableHandle> tableHandle = metadataManager.getTableHandle(tableName);
+        final Optional<TableHandle> tableHandle = metadataManager.getTableHandle(session, tableName);
         checkState(tableHandle.isPresent(), "Table %s does not exist", tableName);
-        if (!(tableHandle.get() instanceof NativeTableHandle)) {
-            throw new PrestoException(CANNOT_DROP_TABLE, "Can only drop native tables");
+        final ConnectorTableHandle connectorHandle = tableHandle.get().getConnectorHandle();
+        if (!(connectorHandle instanceof NativeTableHandle)) {
+            throw new PrestoException(CANNOT_DROP_TABLE.toErrorCode(), "Can only drop native tables");
         }
 
-        Set<TablePartition> partitions = shardManager.getPartitions(tableHandle.get());
+        Set<TablePartition> partitions = shardManager.getPartitions(tableHandle.get().getConnectorHandle());
         for (TablePartition partition : partitions) {
-            shardManager.dropPartition(tableHandle.get(), partition.getPartitionName());
+            shardManager.dropPartition(connectorHandle, partition.getPartitionName());
         }
 
         metadataManager.dropTable(tableHandle.get());

@@ -14,15 +14,16 @@
 package com.facebook.presto.sql.planner;
 
 import com.facebook.presto.metadata.Metadata;
-import com.facebook.presto.spi.ColumnHandle;
+import com.facebook.presto.metadata.ColumnHandle;
 import com.facebook.presto.spi.TupleDomain;
-import com.facebook.presto.sql.analyzer.Type;
 import com.facebook.presto.sql.planner.PlanFragment.OutputPartitioning;
 import com.facebook.presto.sql.planner.PlanFragment.PlanDistribution;
 import com.facebook.presto.sql.planner.plan.AggregationNode;
 import com.facebook.presto.sql.planner.plan.DistinctLimitNode;
 import com.facebook.presto.sql.planner.plan.ExchangeNode;
 import com.facebook.presto.sql.planner.plan.FilterNode;
+import com.facebook.presto.sql.planner.plan.IndexJoinNode;
+import com.facebook.presto.sql.planner.plan.IndexSourceNode;
 import com.facebook.presto.sql.planner.plan.JoinNode;
 import com.facebook.presto.sql.planner.plan.LimitNode;
 import com.facebook.presto.sql.planner.plan.MarkDistinctNode;
@@ -46,6 +47,7 @@ import com.facebook.presto.sql.tree.ComparisonExpression;
 import com.facebook.presto.sql.tree.Expression;
 import com.facebook.presto.sql.tree.FunctionCall;
 import com.facebook.presto.sql.tree.QualifiedNameReference;
+import com.facebook.presto.spi.type.Type;
 import com.facebook.presto.util.GraphvizPrinter;
 import com.facebook.presto.util.JsonPlanPrinter;
 import com.google.common.base.Function;
@@ -167,6 +169,35 @@ public class PlanPrinter
         }
 
         @Override
+        public Void visitIndexSource(IndexSourceNode node, Integer indent)
+        {
+            print(indent, "- IndexSource[%s, lookup = %s] => [%s]", node.getIndexHandle(), node.getLookupSymbols(), formatOutputs(node.getOutputSymbols()));
+            for (Map.Entry<Symbol, ColumnHandle> entry : node.getAssignments().entrySet()) {
+                if (node.getOutputSymbols().contains(entry.getKey())) {
+                    print(indent + 2, "%s := %s", entry.getKey(), entry.getValue());
+                }
+            }
+            return null;
+        }
+
+        @Override
+        public Void visitIndexJoin(IndexJoinNode node, Integer indent)
+        {
+            List<Expression> joinExpressions = new ArrayList<>();
+            for (IndexJoinNode.EquiJoinClause clause : node.getCriteria()) {
+                joinExpressions.add(new ComparisonExpression(ComparisonExpression.Type.EQUAL,
+                        new QualifiedNameReference(clause.getProbe().toQualifiedName()),
+                        new QualifiedNameReference(clause.getIndex().toQualifiedName())));
+            }
+
+            print(indent, "- %sIndexJoin[%s] => [%s]", node.getType().getJoinLabel(), Joiner.on(" AND ").join(joinExpressions), formatOutputs(node.getOutputSymbols()));
+            node.getProbeSource().accept(this, indent + 1);
+            node.getIndexSource().accept(this, indent + 1);
+
+            return null;
+        }
+
+        @Override
         public Void visitLimit(LimitNode node, Integer indent)
         {
             print(indent, "- Limit[%s] => [%s]", node.getCount(), formatOutputs(node.getOutputSymbols()));
@@ -251,11 +282,11 @@ public class PlanPrinter
         @Override
         public Void visitTableScan(TableScanNode node, Integer indent)
         {
-            TupleDomain partitionsDomainSummary = node.getPartitionsDomainSummary();
+            TupleDomain<ColumnHandle> partitionsDomainSummary = node.getPartitionsDomainSummary();
             print(indent, "- TableScan[%s, original constraint=%s] => [%s]", node.getTable(), node.getOriginalConstraint(), formatOutputs(node.getOutputSymbols()));
             for (Map.Entry<Symbol, ColumnHandle> entry : node.getAssignments().entrySet()) {
                 boolean isOutputSymbol = node.getOutputSymbols().contains(entry.getKey());
-                boolean isInOriginalConstraint = DependencyExtractor.extractUnique(node.getOriginalConstraint()).contains(entry.getKey());
+                boolean isInOriginalConstraint = node.getOriginalConstraint() == null ? false : DependencyExtractor.extractUnique(node.getOriginalConstraint()).contains(entry.getKey());
                 boolean isInDomainSummary = !partitionsDomainSummary.isNone() && partitionsDomainSummary.getDomains().keySet().contains(entry.getValue());
 
                 if (isOutputSymbol || isInOriginalConstraint || isInDomainSummary) {
@@ -421,7 +452,7 @@ public class PlanPrinter
         {
             for (PlanFragmentId planFragmentId : node.getSourceFragmentIds()) {
                 PlanFragment target = fragmentsById.get().get(planFragmentId);
-                target.getRoot().accept(this, indent);
+                target.getRoot().accept(new Visitor(target.getSymbols(), fragmentsById), indent);
             }
             return null;
         }

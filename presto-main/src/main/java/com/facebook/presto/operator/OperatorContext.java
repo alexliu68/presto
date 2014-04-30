@@ -14,7 +14,7 @@
 package com.facebook.presto.operator;
 
 import com.facebook.presto.ExceededMemoryLimitException;
-import com.facebook.presto.sql.analyzer.Session;
+import com.facebook.presto.spi.Session;
 import com.google.common.base.Function;
 import com.google.common.base.Supplier;
 import com.google.common.util.concurrent.ListenableFuture;
@@ -93,6 +93,11 @@ public class OperatorContext
         return operatorType;
     }
 
+    public DriverContext getDriverContext()
+    {
+        return driverContext;
+    }
+
     public Session getSession()
     {
         return driverContext.getSession();
@@ -123,10 +128,16 @@ public class OperatorContext
         }
     }
 
-    public void recordGeneratedInput(DataSize dataSize, long positions)
+    public void recordGeneratedInput(DataSize dataSize, long positions, long readNanos)
     {
         inputDataSize.update(dataSize.toBytes());
         inputPositions.update(positions);
+        addInputWallNanos.getAndAdd(readNanos);
+    }
+
+    public void recordGeneratedInput(DataSize dataSize, long positions)
+    {
+        recordGeneratedInput(dataSize, positions, 0);
     }
 
     public void recordGetOutput(Page page)

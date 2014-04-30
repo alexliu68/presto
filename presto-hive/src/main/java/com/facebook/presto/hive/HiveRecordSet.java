@@ -15,9 +15,9 @@ package com.facebook.presto.hive;
 
 import com.facebook.presto.hadoop.HadoopFileSystemCache;
 import com.facebook.presto.hadoop.HadoopNative;
-import com.facebook.presto.spi.ColumnType;
-import com.facebook.presto.spi.RecordCursor;
+import com.facebook.presto.spi.PrestoException;
 import com.facebook.presto.spi.RecordSet;
+import com.facebook.presto.spi.type.Type;
 import com.google.common.base.Optional;
 import com.google.common.base.Throwables;
 import com.google.common.collect.ImmutableList;
@@ -35,6 +35,7 @@ import org.apache.hadoop.mapred.InputFormat;
 import org.apache.hadoop.mapred.JobConf;
 import org.apache.hadoop.mapred.RecordReader;
 import org.apache.hadoop.mapred.Reporter;
+import org.joda.time.DateTimeZone;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -66,18 +67,20 @@ public class HiveRecordSet
 
     private final HiveSplit split;
     private final List<HiveColumnHandle> columns;
-    private final List<ColumnType> columnTypes;
+    private final List<Type> columnTypes;
     private final List<Integer> readHiveColumnIndexes;
     private final Configuration configuration;
     private final Path wrappedPath;
     private final List<HiveRecordCursorProvider> cursorProviders;
+    private final DateTimeZone timeZone;
 
-    public HiveRecordSet(HdfsEnvironment hdfsEnvironment, HiveSplit split, List<HiveColumnHandle> columns, List<HiveRecordCursorProvider> cursorProviders)
+    public HiveRecordSet(HdfsEnvironment hdfsEnvironment, HiveSplit split, List<HiveColumnHandle> columns, List<HiveRecordCursorProvider> cursorProviders, DateTimeZone timeZone)
     {
         this.split = checkNotNull(split, "split is null");
         this.columns = ImmutableList.copyOf(checkNotNull(columns, "columns is null"));
         this.columnTypes = ImmutableList.copyOf(Iterables.transform(columns, nativeTypeGetter()));
         this.cursorProviders = ImmutableList.copyOf(checkNotNull(cursorProviders, "cursor providers is null"));
+        this.timeZone = checkNotNull(timeZone, "timeZone is null");
 
         // determine which hive columns we will read
         List<HiveColumnHandle> readColumns = ImmutableList.copyOf(filter(columns, not(isPartitionKeyPredicate())));
@@ -98,13 +101,13 @@ public class HiveRecordSet
     }
 
     @Override
-    public List<ColumnType> getColumnTypes()
+    public List<Type> getColumnTypes()
     {
         return columnTypes;
     }
 
     @Override
-    public RecordCursor cursor()
+    public HiveRecordCursor cursor()
     {
         // Tell hive the columns we would like to read, this lets hive optimize reading column oriented files
         ColumnProjectionUtils.setReadColumnIDs(configuration, readHiveColumnIndexes);
@@ -112,7 +115,7 @@ public class HiveRecordSet
         RecordReader<?, ?> recordReader = createRecordReader(split, configuration, wrappedPath);
 
         for (HiveRecordCursorProvider provider : cursorProviders) {
-            Optional<RecordCursor> cursor = provider.createHiveRecordCursor(split, recordReader, columns);
+            Optional<HiveRecordCursor> cursor = provider.createHiveRecordCursor(split, recordReader, columns, timeZone);
             if (cursor.isPresent()) {
                 return cursor.get();
             }
@@ -166,7 +169,7 @@ public class HiveRecordSet
             });
         }
         catch (Exception e) {
-            throw new RuntimeException(String.format("Error opening Hive split %s (offset=%s, length=%s) using %s: %s",
+            throw new PrestoException(HiveErrorCode.HIVE_CANNOT_OPEN_SPLIT.toErrorCode(), String.format("Error opening Hive split %s (offset=%s, length=%s) using %s: %s",
                     split.getPath(),
                     split.getStart(),
                     split.getLength(),

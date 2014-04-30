@@ -13,32 +13,32 @@
  */
 package com.facebook.presto.operator.aggregation;
 
-import com.facebook.presto.block.Block;
 import com.facebook.presto.block.BlockAssertions;
-import com.facebook.presto.block.BlockBuilder;
 import com.facebook.presto.operator.OperatorAssertion;
 import com.facebook.presto.operator.Page;
-import com.facebook.presto.tuple.TupleInfo;
+import com.facebook.presto.spi.block.Block;
+import com.facebook.presto.spi.block.BlockBuilder;
+import com.facebook.presto.spi.block.BlockBuilderStatus;
+import com.facebook.presto.spi.type.Type;
 import com.google.common.base.Optional;
 import com.google.common.collect.ImmutableList;
-import com.google.common.collect.Iterables;
-import com.google.common.collect.Lists;
+import org.apache.commons.math3.distribution.BinomialDistribution;
 import org.testng.annotations.Test;
 
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 import java.util.Random;
 
 import static com.facebook.presto.operator.aggregation.AggregationTestUtils.assertApproximateAggregation;
-import static com.facebook.presto.tuple.TupleInfo.SINGLE_DOUBLE;
-import static com.facebook.presto.tuple.TupleInfo.SINGLE_LONG;
+import static com.facebook.presto.spi.type.BigintType.BIGINT;
+import static com.facebook.presto.spi.type.DoubleType.DOUBLE;
 import static org.testng.Assert.assertTrue;
 
 public abstract class AbstractTestApproximateAggregationFunction
         extends AbstractTestAggregationFunction
 {
-    protected abstract TupleInfo getTupleInfo();
+    private static final int WEIGHT = 10;
+    protected abstract Type getType();
 
     // values may contain nulls
     protected abstract Double getExpectedValue(List<Number> values);
@@ -46,19 +46,19 @@ public abstract class AbstractTestApproximateAggregationFunction
     @Override
     public double getConfidence()
     {
-        return 0.99;
+        return 0.5;
     }
 
     @Override
     public Block getSequenceBlock(int start, int length)
     {
-        BlockBuilder blockBuilder = new BlockBuilder(getTupleInfo());
+        BlockBuilder blockBuilder = getType().createBlockBuilder(new BlockBuilderStatus());
         for (int i = start; i < start + length; i++) {
-            if (getTupleInfo() == SINGLE_LONG) {
-                blockBuilder.append((long) i);
+            if (getType() == BIGINT) {
+                blockBuilder.appendLong((long) i);
             }
             else {
-                blockBuilder.append((double) i);
+                blockBuilder.appendDouble((double) i);
             }
         }
         return blockBuilder.build();
@@ -69,14 +69,15 @@ public abstract class AbstractTestApproximateAggregationFunction
     {
         List<Number> values = new ArrayList<>();
         for (int i = 0; i < length; i++) {
-            // Insert twice since we use a sample weight of two
-            if (getTupleInfo() == SINGLE_LONG) {
-                values.add((long) start + i);
-                values.add((long) start + i);
+            if (getType() == BIGINT) {
+                for (int j = 0; j < WEIGHT; j++) {
+                    values.add((long) start + i);
+                }
             }
             else {
-                values.add((double) start + i);
-                values.add((double) start + i);
+                for (int j = 0; j < WEIGHT; j++) {
+                    values.add((double) start + i);
+                }
             }
         }
 
@@ -88,20 +89,21 @@ public abstract class AbstractTestApproximateAggregationFunction
     {
         List<Number> values = new ArrayList<>();
         for (int i = 0; i < length; i++) {
-            // Insert twice since we use a sample weight of two
-            if (getTupleInfo() == SINGLE_LONG) {
-                values.add((long) start + i);
-                values.add((long) start + i);
+            if (getType() == BIGINT) {
+                for (int j = 0; j < WEIGHT; j++) {
+                    values.add((long) start + i);
+                }
             }
             else {
-                values.add((double) start + i);
-                values.add((double) start + i);
+                for (int j = 0; j < WEIGHT; j++) {
+                    values.add((double) start + i);
+                }
             }
         }
         for (int i = length; i < lengthIncludingNulls; i++) {
-            // Insert twice since we use a sample weight of two
-            values.add(null);
-            values.add(null);
+            for (int j = 0; j < WEIGHT; j++) {
+                values.add(null);
+            }
         }
 
         return getExpectedValue(values);
@@ -111,7 +113,7 @@ public abstract class AbstractTestApproximateAggregationFunction
     public void testCorrectnessOnGaussianData()
             throws Exception
     {
-        int originalDataSize = 100;
+        int originalDataSize = 10000;
         Random distribution = new Random(0);
         List<Number> list = new ArrayList<>();
         for (int i = 0; i < originalDataSize; i++) {
@@ -125,7 +127,7 @@ public abstract class AbstractTestApproximateAggregationFunction
     public void testCorrectnessOnUniformData()
             throws Exception
     {
-        int originalDataSize = 100;
+        int originalDataSize = 10000;
         Random distribution = new Random(0);
         List<Number> list = new ArrayList<>();
         for (int i = 0; i < originalDataSize; i++) {
@@ -140,28 +142,33 @@ public abstract class AbstractTestApproximateAggregationFunction
     {
         int inRange = 0;
         int numberOfRuns = 1000;
-        double sampleRatio = 0.1;
+        double sampleRatio = 1 / (double) WEIGHT;
+        double actual = getExpectedValue(inputList);
+        Random rand = new Random(1);
 
         for (int i = 0; i < numberOfRuns; i++) {
             //Compute Sampled Value using sampledList (numberOfRuns times)
-            Iterable<Number> sampledList = Iterables.limit(shuffle(inputList, i), (int) (inputList.size() * sampleRatio));
-            // Duplicate every element in the list, since we're going to use a sample weight of two
-            double actual = getExpectedValue(ImmutableList.<Number>builder().addAll(sampledList).addAll(sampledList).build());
-
-            BlockBuilder builder = new BlockBuilder(getTupleInfo());
-            for (Number sample : sampledList) {
-                if (getTupleInfo() == SINGLE_LONG) {
-                    builder.append(sample.longValue());
+            ImmutableList.Builder<Number> sampledList = ImmutableList.builder();
+            for (Number x : inputList) {
+                if (rand.nextDouble() < sampleRatio) {
+                    sampledList.add(x);
                 }
-                else if (getTupleInfo() == SINGLE_DOUBLE) {
-                    builder.append(sample.doubleValue());
+            }
+
+            BlockBuilder builder = getType().createBlockBuilder(new BlockBuilderStatus());
+            for (Number sample : sampledList.build()) {
+                if (getType() == BIGINT) {
+                    builder.appendLong(sample.longValue());
+                }
+                else if (getType() == DOUBLE) {
+                    builder.appendDouble(sample.doubleValue());
                 }
                 else {
                     throw new AssertionError("Can only handle longs and doubles");
                 }
             }
             Page page = new Page(builder.build());
-            page = OperatorAssertion.appendSampleWeight(ImmutableList.of(page), 2).get(0);
+            page = OperatorAssertion.appendSampleWeight(ImmutableList.of(page), WEIGHT).get(0);
             Accumulator accumulator = getFunction().createAggregation(Optional.<Integer>absent(), Optional.of(page.getChannelCount() - 1), getConfidence(), 0);
 
             accumulator.addInput(page);
@@ -177,20 +184,16 @@ public abstract class AbstractTestApproximateAggregationFunction
             }
         }
 
-        assertTrue(inRange >= getConfidence() * numberOfRuns);
+        BinomialDistribution binomial = new BinomialDistribution(numberOfRuns, getConfidence());
+        int lowerBound = binomial.inverseCumulativeProbability(0.01);
+        int upperBound = binomial.inverseCumulativeProbability(0.99);
+        assertTrue(lowerBound < inRange && inRange < upperBound, String.format("%d out of %d passed. Expected [%d, %d]", inRange, numberOfRuns, lowerBound, upperBound));
     }
 
     @Override
     protected void testAggregation(Object expectedValue, Block block)
     {
-        Page page = OperatorAssertion.appendSampleWeight(ImmutableList.of(new Page(block)), 2).get(0);
+        Page page = OperatorAssertion.appendSampleWeight(ImmutableList.of(new Page(block)), WEIGHT).get(0);
         assertApproximateAggregation(getFunction(), page.getChannelCount() - 1, getConfidence(), (Double) expectedValue, page);
-    }
-
-    private static List<Number> shuffle(Iterable<Number> iterable, long seed)
-    {
-        List<Number> list = Lists.newArrayList(iterable);
-        Collections.shuffle(list, new Random(seed));
-        return list;
     }
 }
